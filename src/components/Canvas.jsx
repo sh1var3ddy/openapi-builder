@@ -34,7 +34,9 @@ export default function Canvas() {
         URL.revokeObjectURL(url);
     };
 
-
+  const deleteBlock = (index) => {
+    setBlocks((prev) => prev.filter((_, i) => i !== index));
+  };
   const updatePath = (index, newPath) => {
     setBlocks((prev) =>
       prev.map((block, i) =>
@@ -87,14 +89,17 @@ export default function Canvas() {
       >
         <h2>Drop here to create endpoints</h2>
         {blocks.map((block, idx) => (
-          <div key={idx} className={styles.endpointBlock}>
-            <input
-              className={styles.pathInput}
-              value={block.path}
-              onChange={(e) => updatePath(idx, e.target.value)}
-            />
-            <span className={styles.method}>{block.method.toUpperCase()}</span>
-          </div>
+            <div key={idx} className={styles.endpointBlock}>
+                <input
+                className={styles.pathInput}
+                value={block.path}
+                onChange={(e) => updatePath(idx, e.target.value)}
+                />
+                <span className={styles.method}>{block.method.toUpperCase()}</span>
+                <button onClick={() => deleteBlock(idx)} className={styles.deleteBtn}>
+                ✕
+                </button>
+            </div>
         ))}
       </div>
        <div className={styles.specViewer}>
