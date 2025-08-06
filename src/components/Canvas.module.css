@@ -3,13 +3,32 @@
   padding: 1rem;
   min-height: 300px;
   border: 2px dashed #ccc;
-  background-color: #8c2d2d;
+  background-color: #fdfdfd;
 }
 
 .endpoint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 8px;
   margin-top: 6px;
-  background-color: #2a4765;
+  background-color: #e9ecef;
   border-left: 4px solid #007bff;
+  border-radius: 4px;
+}
+
+.pathInput {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.method {
+  font-weight: bold;
+  background-color: #007bff;
+  color: white;
+  padding: 4px 10px;
   border-radius: 4px;
 }
