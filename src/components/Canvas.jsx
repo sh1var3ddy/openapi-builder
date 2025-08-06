@@ -149,16 +149,29 @@ export default function Canvas() {
         const required = [];
 
         schema.fields.forEach((field) => {
-          if (field.name) {
-            if (field.type === "enum") {
+          if (field.type === "enum") {
               properties[field.name] = {
-                type: "string", // Enums are usually strings
+                type: "string",
                 enum: field.enum?.filter((v) => v?.trim()) || [],
               };
-            } else {
-              properties[field.name] = { type: field.type };
-            }
-            required.push(field.name);
+        } else if (field.type === "array") {
+          if (field.itemsType === "$ref" && field.ref) {
+            properties[field.name] = {
+              type: "array",
+              items: {
+                $ref: `#/components/schemas/${field.ref}`,
+              },
+            };
+          } else {
+            properties[field.name] = {
+              type: "array",
+              items: {
+                type: field.itemsType || "string",
+              },
+            };
+          }
+        } else {
+          properties[field.name] = { type: field.type };
           }
         });
 
@@ -278,35 +291,71 @@ export default function Canvas() {
                     <option value="boolean">boolean</option>
                     <option value="number">number</option>
                     <option value="enum">enum</option> {/* ✅ NEW */}
+                    <option value="array">array</option>{/* ✅ New */}
                   </select>
-                {field.type === "enum" && (
-                  <div className={styles.enumEditor}>
-                    {(field.enum || []).map((val, eIdx) => (
-                      <div key={eIdx} className={styles.enumRow}>
-                        <input
+                  {field.type === "enum" && (
+                    <div className={styles.enumEditor}>
+                      {(field.enum || []).map((val, eIdx) => (
+                        <div key={eIdx} className={styles.enumRow}>
+                          <input
+                            className={styles.metaInput}
+                            value={val}
+                            onChange={(e) =>
+                              updateField(sIdx, fIdx, "enum", [
+                                ...field.enum.slice(0, eIdx),
+                                e.target.value,
+                                ...field.enum.slice(eIdx + 1),
+                              ])
+                            }
+                            placeholder="Enum value"
+                          />
+                          <button
+                            onClick={() => {
+                              const updated = [...field.enum];
+                              updated.splice(eIdx, 1);
+                              updateField(sIdx, fIdx, "enum", updated);
+                            }}
+                            className={styles.deleteBtn}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      {field.type === "array" && (
+                      <div className={styles.arrayConfig}>
+                        <label>Array of:</label>
+                        <select
                           className={styles.metaInput}
-                          value={val}
+                          value={field.itemsType || "string"}
                           onChange={(e) =>
-                            updateField(sIdx, fIdx, "enum", [
-                              ...field.enum.slice(0, eIdx),
-                              e.target.value,
-                              ...field.enum.slice(eIdx + 1),
-                            ])
+                            updateField(sIdx, fIdx, "itemsType", e.target.value)
                           }
-                          placeholder="Enum value"
-                        />
-                        <button
-                          onClick={() => {
-                            const updated = [...field.enum];
-                            updated.splice(eIdx, 1);
-                            updateField(sIdx, fIdx, "enum", updated);
-                          }}
-                          className={styles.deleteBtn}
                         >
-                          ✕
-                        </button>
+                          <option value="string">string</option>
+                          <option value="integer">integer</option>
+                          <option value="boolean">boolean</option>
+                          <option value="number">number</option>
+                          <option value="$ref">Schema Reference</option>
+                        </select>
+
+                        {field.itemsType === "$ref" && (
+                          <select
+                            className={styles.metaInput}
+                            value={field.ref || ""}
+                            onChange={(e) =>
+                              updateField(sIdx, fIdx, "ref", e.target.value)
+                            }
+                          >
+                            <option value="">-- Select Schema --</option>
+                            {schemas.map((s) => (
+                              <option key={s.name} value={s.name}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
-                    ))}
+                    )}
                     <button
                       onClick={() =>
                         updateField(sIdx, fIdx, "enum", [...(field.enum || []), ""])
