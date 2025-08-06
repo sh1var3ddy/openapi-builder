@@ -38,9 +38,8 @@ export default function Canvas() {
         path: "/new-path",
         operationId: `${item.method.toLowerCase()}_${Date.now()}`,
         description: "",
-        responses: [
-          { status: "200", description: "Success", schemaRef: "" },
-        ],
+        requestSchemaRef: "",   // ✅ add this
+        responseSchemaRef: "",  // ✅ and this
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -133,39 +132,85 @@ export default function Canvas() {
       parsed.paths = {};
 
       blocks.forEach((block) => {
-        const { method, path, operationId, description, responses = [] } = block;
-
-        const responseMap = {};
-        responses.forEach((res) => {
-          const resp = {
-            description: res.description || "",
-          };
-          if (res.schemaRef) {
-            resp.content = {
-              "application/json": {
-                schema: {
-                  $ref: `#/components/schemas/${res.schemaRef}`,
-                },
-              },
-            };
-          }
-          responseMap[res.status || "default"] = resp;
-        });
+        const {
+          method,
+          path,
+          operationId,
+          description,
+          responses = [],
+          requestSchemaRef,
+          responseSchemaRef,
+        } = block;
 
         if (!parsed.paths[path]) parsed.paths[path] = {};
-        parsed.paths[path][method] = {
+
+        const methodObject = {
           summary: `${method.toUpperCase()} ${path}`,
           operationId,
           description,
-          responses: responseMap,
+          responses: {},
         };
+
+        // ✅ Request Body from selected schema
+        if (requestSchemaRef) {
+          methodObject.requestBody = {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: `#/components/schemas/${requestSchemaRef}`,
+                },
+              },
+            },
+          };
+        }
+
+        // ✅ Custom Responses
+        if (responses.length > 0) {
+          responses.forEach((res) => {
+            const resp = {
+              description: res.description || "",
+            };
+            if (res.schemaRef) {
+              resp.content = {
+                "application/json": {
+                  schema: {
+                    $ref: `#/components/schemas/${res.schemaRef}`,
+                  },
+                },
+              };
+            }
+            methodObject.responses[res.status || "default"] = resp;
+          });
+        } else if (responseSchemaRef) {
+          // ✅ Default 200 response from dropdown
+          methodObject.responses["200"] = {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: `#/components/schemas/${responseSchemaRef}`,
+                },
+              },
+            },
+          };
+        } else {
+          // ✅ Fallback response
+          methodObject.responses["200"] = {
+            description: "Success",
+          };
+        }
+
+        parsed.paths[path][method] = methodObject;
       });
 
+      // ✅ Components > Schemas
       parsed.components = parsed.components || {};
       parsed.components.schemas = {};
 
       schemas.forEach((schema) => {
         if (!schema.name) return;
+
         const properties = {};
         const required = [];
 
@@ -221,6 +266,7 @@ export default function Canvas() {
           blocks={blocks}
           updateBlock={updateBlock}
           deleteBlock={deleteBlock}
+          schemas={schemas} // ✅ add this
         />
       </div>
 
