@@ -84,52 +84,55 @@ export default function Canvas() {
   }, [blocks]);
 
   return (
-    <div className={styles.canvasContainer}>
-      <div
-        ref={drop}
-        className={styles.canvas}
-        style={{ backgroundColor: isOver ? "#eef" : "#fdfdfd" }}
-      >
-        <h2>Drop here to create endpoints</h2>
-        {blocks.map((block, idx) => (
-          <div key={idx} className={styles.endpointBlock}>
-            <input
-              className={styles.pathInput}
-              value={block.path}
-              onChange={(e) => updatePath(idx, e.target.value)}
-            />
-            <span className={styles.method}>{block.method.toUpperCase()}</span>
-            <button
-              onClick={() => deleteBlock(idx)}
-              className={styles.deleteBtn}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className={styles.specViewer}>
-        <div className={styles.specHeader}>
-          <h3>Generated OpenAPI YAML</h3>
-          <button onClick={downloadYaml} className={styles.downloadBtn}>
-            Download YAML
+  <div className={styles.canvasContainer}>
+    {/* Canvas for endpoints */}
+    <div
+      ref={drop}
+      className={styles.canvas}
+      style={{ backgroundColor: isOver ? "#1e2a3a" : undefined }}
+    >
+      <h2>Drop here to create endpoints</h2>
+      {blocks.map((block, idx) => (
+        <div key={idx} className={styles.endpointBlock}>
+          <input
+            className={styles.pathInput}
+            value={block.path}
+            onChange={(e) => updatePath(idx, e.target.value)}
+          />
+          <span className={styles.method}>{block.method.toUpperCase()}</span>
+          <button
+            onClick={() => deleteBlock(idx)}
+            className={styles.deleteBtn}
+          >
+            ✕
           </button>
         </div>
-        <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
-      </div>
-
-      <div className={styles.swaggerPanel}>
-        <h3>Swagger UI Preview</h3>
-        {(() => {
-          try {
-            const parsedSpec = yaml.load(yamlSpec);
-            return <SwaggerPreview spec={parsedSpec} />;
-          } catch (err) {
-            return <p style={{ color: "red" }}>Invalid YAML</p>;
-          }
-        })()}
-      </div>
+      ))}
     </div>
-  );
+
+    {/* YAML Editor */}
+    <div className={styles.specViewer}>
+      <div className={styles.specHeader}>
+        <h3>Generated OpenAPI YAML</h3>
+        <button onClick={downloadYaml} className={styles.downloadBtn}>
+          Download YAML
+        </button>
+      </div>
+      <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
+    </div>
+
+    {/* Swagger UI */}
+    <div className={styles.swaggerPanel}>
+      <h3>Swagger UI Preview</h3>
+      {(() => {
+        try {
+          const parsedSpec = yaml.load(yamlSpec);
+          return <SwaggerPreview spec={parsedSpec} />;
+        } catch (err) {
+          return <p style={{ color: "red" }}>Invalid YAML</p>;
+        }
+      })()}
+    </div>
+  </div>
+);
 }
