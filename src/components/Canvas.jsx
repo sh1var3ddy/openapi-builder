@@ -1,10 +1,12 @@
 import { useDrop } from "react-dnd";
 import { useState, useEffect } from "react";
 import styles from "./Canvas.module.css";
+import yaml from "js-yaml";
 
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
   const [openapi, setOpenapi] = useState({});
+  const [yamlSpec, setYamlSpec] = useState("");
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "method",
@@ -28,7 +30,7 @@ export default function Canvas() {
     );
   };
 
-  // Build OpenAPI spec
+  // Build OpenAPI spec + convert to YAML
   useEffect(() => {
     const spec = {
       openapi: "3.0.0",
@@ -54,6 +56,13 @@ export default function Canvas() {
     });
 
     setOpenapi(spec);
+
+    try {
+      const yamlStr = yaml.dump(spec);
+      setYamlSpec(yamlStr);
+    } catch (e) {
+      console.error("YAML generation failed", e);
+    }
   }, [blocks]);
 
   return (
@@ -76,11 +85,12 @@ export default function Canvas() {
         ))}
       </div>
 
-      {/* Show JSON preview */}
+      {/* YAML view */}
       <div className={styles.specViewer}>
-        <h3>Generated OpenAPI Spec</h3>
-        <pre>{JSON.stringify(openapi, null, 2)}</pre>
+        <h3>Generated OpenAPI YAML</h3>
+        <pre>{yamlSpec}</pre>
       </div>
     </div>
   );
 }
+
