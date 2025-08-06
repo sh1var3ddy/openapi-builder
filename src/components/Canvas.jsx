@@ -21,6 +21,18 @@ export default function Canvas() {
       isOver: monitor.isOver(),
     }),
   }));
+    const downloadYaml = () => {
+        const blob = new Blob([yamlSpec], { type: "text/yaml" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "openapi.yaml";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
 
   const updatePath = (index, newPath) => {
     setBlocks((prev) =>
@@ -84,12 +96,15 @@ export default function Canvas() {
           </div>
         ))}
       </div>
-
-      {/* YAML view */}
-      <div className={styles.specViewer}>
-        <h3>Generated OpenAPI YAML</h3>
-        <pre>{yamlSpec}</pre>
-      </div>
+       <div className={styles.specViewer}>
+            <div className={styles.specHeader}>
+                <h3>Generated OpenAPI YAML</h3>
+                <button onClick={downloadYaml} className={styles.downloadBtn}>
+                Download YAML
+                </button>
+            </div>
+            <pre>{yamlSpec}</pre>
+        </div>
     </div>
   );
 }

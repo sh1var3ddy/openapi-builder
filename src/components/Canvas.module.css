@@ -38,11 +38,36 @@
 
 .specViewer {
   flex: 1;
-  background-color: #4c5660;
+  background-color: #71889f;
   padding: 1rem;
   border: 1px solid #ccc;
   border-radius: 6px;
   overflow: auto;
   max-height: 600px;
+  display: flex;
+  flex-direction: column;
 }
+
+.specHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.downloadBtn {
+  padding: 6px 12px;
+  background-color: #28a745;
+  color: white;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.downloadBtn:hover {
+  background-color: #218838;
+}
+
+
 
