@@ -105,3 +105,23 @@
   width: 100%;
   font-size: 13px;
 }
+
+.schemaPanel {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border: 1px solid #ccc;
+}
+
+.schemaBlock {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  border-left: 4px solid #666;
+  background-color: #fff;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}

@@ -8,6 +8,7 @@ import SwaggerPreview from "./SwaggerPreview";
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
   const [openapi, setOpenapi] = useState({});
+  const [schemas, setSchemas] = useState([]);
   const [yamlSpec, setYamlSpec] = useState(() =>
     yaml.dump({
       openapi: "3.0.0",
@@ -75,41 +76,107 @@ export default function Canvas() {
     );
   };
 
+  const addNewSchema = () => {
+  setSchemas((prev) => [...prev, { name: "", fields: [] }]);
+};
+
+  const updateSchemaName = (index, newName) => {
+    setSchemas((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, name: newName } : s))
+    );
+  };
+
+  const addSchemaField = (schemaIndex) => {
+    setSchemas((prev) =>
+      prev.map((s, i) =>
+        i === schemaIndex
+          ? { ...s, fields: [...s.fields, { name: "", type: "string" }] }
+          : s
+      )
+    );
+  };
+
+  const updateSchemaField = (schemaIndex, fieldIndex, key, value) => {
+    setSchemas((prev) =>
+      prev.map((s, i) => {
+        if (i !== schemaIndex) return s;
+        const fields = [...s.fields];
+        fields[fieldIndex][key] = value;
+        return { ...s, fields };
+      })
+    );
+  };
+
+  const deleteSchemaField = (schemaIndex, fieldIndex) => {
+    setSchemas((prev) =>
+      prev.map((s, i) => {
+        if (i !== schemaIndex) return s;
+        const fields = s.fields.filter((_, j) => j !== fieldIndex);
+        return { ...s, fields };
+      })
+    );
+  };
+
+
   // Build OpenAPI spec + convert to YAML
   useEffect(() => {
     try {
-      // Parse the current YAML spec
       const parsed = yaml.load(yamlSpec);
 
-      // Replace the 'paths' with the ones generated from blocks
+      // Reset the paths
       parsed.paths = {};
 
+      // Generate endpoint paths from blocks
       blocks.forEach((block) => {
-          const { method, path } = block;
-          if (!parsed.paths[path]) {
-            parsed.paths[path] = {};
-          }
-          parsed.paths[path][method] = {
-            summary: `${method.toUpperCase()} ${path}`,
-            operationId: block.operationId,
-            description: block.description,
-            responses: {
-              "200": {
-                description: "Success",
-              },
+        const { method, path, operationId, description } = block;
+        if (!parsed.paths[path]) {
+          parsed.paths[path] = {};
+        }
+        parsed.paths[path][method] = {
+          summary: `${method.toUpperCase()} ${path}`,
+          operationId,
+          description,
+          responses: {
+            "200": {
+              description: "Success",
             },
-          };
+          },
+        };
       });
 
-    setOpenapi(parsed);
+      // Add component schemas
+      parsed.components = parsed.components || {};
+      parsed.components.schemas = {};
 
-    // Convert back to YAML
-    const newYaml = yaml.dump(parsed);
+      schemas.forEach((schema) => {
+        if (!schema.name) return;
+
+        const properties = {};
+        const required = [];
+
+        schema.fields.forEach((field) => {
+          if (field.name) {
+            properties[field.name] = { type: field.type };
+            required.push(field.name);
+          }
+        });
+
+        parsed.components.schemas[schema.name] = {
+          type: "object",
+          properties,
+          required,
+        };
+      });
+
+      setOpenapi(parsed);
+
+      // Convert updated spec back to YAML
+      const newYaml = yaml.dump(parsed);
       setYamlSpec(newYaml);
     } catch (e) {
       console.error("Failed to parse or update YAML", e);
     }
-  }, [blocks]);
+  }, [blocks, schemas]);
 
   return (
   <div className={styles.canvasContainer}>
@@ -169,6 +236,50 @@ export default function Canvas() {
         }
       })()}
     </div>
+    {/* Schema Management */}
+    {/* Schema Builder */}
+    <div className={styles.schemaPanel}>
+      <h3>Component Schemas</h3>
+      {schemas.map((schema, sIdx) => (
+        <div key={sIdx} className={styles.schemaBlock}>
+          <input
+            className={styles.metaInput}
+            value={schema.name}
+            onChange={(e) => updateSchemaName(sIdx, e.target.value)}
+            placeholder="Schema Name"
+          />
+          {(schema.fields ?? []).map((field, fIdx) => (
+            <div key={fIdx} className={styles.fieldRow}>
+              <input
+                className={styles.metaInput}
+                value={field.name}
+                onChange={(e) => updateSchemaField(sIdx, fIdx, "name", e.target.value)}
+                placeholder="Field Name"
+              />
+              <select
+                className={styles.metaInput}
+                value={field.type}
+                onChange={(e) => updateSchemaField(sIdx, fIdx, "type", e.target.value)}
+              >
+                <option value="string">string</option>
+                <option value="integer">integer</option>
+                <option value="boolean">boolean</option>
+                <option value="number">number</option>
+              </select>
+              <button onClick={() => deleteSchemaField(sIdx, fIdx)} className={styles.deleteBtn}>
+                ✕
+              </button>
+            </div>
+          ))}
+          <button onClick={() => addSchemaField(sIdx)} className={styles.addBtn}>
+            + Add Field
+          </button>
+        </div>
+      ))}
+
+      <button onClick={addNewSchema} className={styles.addBtn}>+ New Schema</button>
+    </div>
+
   </div>
 );
 }
