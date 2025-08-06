@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import YamlEditor from "./YamlEditor";
 import SwaggerPreview from "./SwaggerPreview";
 import SchemaBuilder from "./SchemaBuilder";
+import EndpointBuilder from "./EndpointBuilder";
 
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
@@ -216,98 +217,11 @@ export default function Canvas() {
         style={{ backgroundColor: isOver ? "#1e2a3a" : undefined }}
       >
         <h2>Drop here to create endpoints</h2>
-        {blocks.map((block, idx) => (
-          <div key={idx} className={styles.endpointBlock}>
-            <input
-              className={styles.pathInput}
-              value={block.path}
-              onChange={(e) => updateBlock(idx, "path", e.target.value)}
-              placeholder="/new-path"
-            />
-            <input
-              className={styles.metaInput}
-              value={block.operationId}
-              onChange={(e) =>
-                updateBlock(idx, "operationId", e.target.value)
-              }
-              placeholder="operationId"
-            />
-            <textarea
-              className={styles.metaInput}
-              value={block.description}
-              onChange={(e) =>
-                updateBlock(idx, "description", e.target.value)
-              }
-              placeholder="Description"
-            />
-            <span className={styles.method}>{block.method.toUpperCase()}</span>
-            <button
-              onClick={() => deleteBlock(idx)}
-              className={styles.deleteBtn}
-            >
-              ✕
-            </button>
-
-            {/* Custom responses */}
-            {(block.responses || []).map((res, rIdx) => (
-              <div key={rIdx} className={styles.responseRow}>
-                <input
-                  className={styles.metaInput}
-                  value={res.status}
-                  placeholder="Status Code"
-                  onChange={(e) =>
-                    updateBlock(idx, "responses", block.responses.map((r, i) =>
-                      i === rIdx ? { ...r, status: e.target.value } : r
-                    ))
-                  }
-                />
-                <input
-                  className={styles.metaInput}
-                  value={res.description}
-                  placeholder="Description"
-                  onChange={(e) =>
-                    updateBlock(idx, "responses", block.responses.map((r, i) =>
-                      i === rIdx ? { ...r, description: e.target.value } : r
-                    ))
-                  }
-                />
-                <select
-                  className={styles.metaInput}
-                  value={res.schemaRef || ""}
-                  onChange={(e) =>
-                    updateBlock(idx, "responses", block.responses.map((r, i) =>
-                      i === rIdx ? { ...r, schemaRef: e.target.value } : r
-                    ))
-                  }
-                >
-                  <option value="">-- No Schema --</option>
-                  {schemas.map((s) => (
-                    <option key={s.name} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() =>
-                    updateBlock(idx, "responses", block.responses.filter((_, i) => i !== rIdx))
-                  }
-                  className={styles.deleteBtn}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() =>
-                updateBlock(idx, "responses", [
-                  ...(block.responses || []),
-                  { status: "", description: "", schemaRef: "" },
-                ])
-              }
-              className={styles.addBtn}
-            >
-              + Add Response
-            </button>
-          </div>
-        ))}
+        <EndpointBuilder
+          blocks={blocks}
+          updateBlock={updateBlock}
+          deleteBlock={deleteBlock}
+        />
       </div>
 
       <div className={styles.specViewer}>
