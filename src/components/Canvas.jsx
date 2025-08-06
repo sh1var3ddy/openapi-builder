@@ -2,6 +2,7 @@ import { useDrop } from "react-dnd";
 import { useState, useEffect } from "react";
 import styles from "./Canvas.module.css";
 import yaml from "js-yaml";
+import YamlEditor from "./YamlEditor";
 
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
@@ -103,7 +104,7 @@ export default function Canvas() {
                 Download YAML
                 </button>
             </div>
-            <pre>{yamlSpec}</pre>
+            <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
         </div>
     </div>
   );
