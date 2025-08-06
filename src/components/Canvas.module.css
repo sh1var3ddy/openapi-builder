@@ -77,4 +77,14 @@
   cursor: pointer;
 }
 
+.swaggerPanel {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  max-height: 600px;
+  overflow: auto;
+}
+
 

@@ -1,21 +1,21 @@
-import {useDrag} from 'react-dnd';
+import { useDrag } from 'react-dnd';
 import styles from './Sidebar.module.css';
 
 const methods = ["GET", "POST", "PUT", "DELETE"];
 
-function DraggableMethod({method}) {
-  const [{isDragging}, drag] = useDrag({
+function DraggableMethod({ method }) {
+  const [{ isDragging }, drag] = useDrag(() => ({
     type: 'method',
-    item: {method},
+    item: { method },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-  });
+  }));
 
   return (
     <div
       ref={drag}
-      className={`${styles.method} ${isDragging ? styles.dragging : ''}`}
+      className={`${styles.method} ${styles[method]} ${isDragging ? styles.dragging : ''}`}
     >
       {method}
     </div>
