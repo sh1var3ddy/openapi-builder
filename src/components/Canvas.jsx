@@ -8,7 +8,24 @@ import SwaggerPreview from "./SwaggerPreview";
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
   const [openapi, setOpenapi] = useState({});
-  const [yamlSpec, setYamlSpec] = useState("");
+  const [yamlSpec, setYamlSpec] = useState(() =>
+    yaml.dump({
+      openapi: "3.0.0",
+      info: {
+        title: "Swagger Builder API",
+        version: "1.0.0",
+        description: "Generated using drag-and-drop builder",
+      },
+      servers: [
+        {
+          url: "http://localhost:8080/api",
+          description: "Development server",
+        },
+      ],
+      paths: {},
+    })
+  );
+
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "method",
@@ -50,36 +67,34 @@ export default function Canvas() {
 
   // Build OpenAPI spec + convert to YAML
   useEffect(() => {
-    const spec = {
-      openapi: "3.0.0",
-      info: {
-        title: "Swagger Builder API",
-        version: "1.0.0",
-      },
-      paths: {},
-    };
+    try {
+      // Parse the current YAML spec
+      const parsed = yaml.load(yamlSpec);
 
-    blocks.forEach(({ method, path }) => {
-      if (!spec.paths[path]) {
-        spec.paths[path] = {};
-      }
-      spec.paths[path][method] = {
-        summary: `${method.toUpperCase()} ${path}`,
-        responses: {
-          "200": {
-            description: "Success",
+      // Replace the 'paths' with the ones generated from blocks
+      parsed.paths = {};
+
+      blocks.forEach(({ method, path }) => {
+        if (!parsed.paths[path]) {
+          parsed.paths[path] = {};
+        }
+        parsed.paths[path][method] = {
+          summary: `${method.toUpperCase()} ${path}`,
+          responses: {
+            "200": {
+              description: "Success",
+            },
           },
-        },
       };
     });
 
-    setOpenapi(spec);
+    setOpenapi(parsed);
 
-    try {
-      const yamlStr = yaml.dump(spec);
-      setYamlSpec(yamlStr);
+    // Convert back to YAML
+    const newYaml = yaml.dump(parsed);
+      setYamlSpec(newYaml);
     } catch (e) {
-      console.error("YAML generation failed", e);
+      console.error("Failed to parse or update YAML", e);
     }
   }, [blocks]);
 
