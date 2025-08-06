@@ -33,6 +33,8 @@ export default function Canvas() {
       const newBlock = {
         method: item.method.toLowerCase(),
         path: "/new-path",
+        operationId: `${item.method.toLowerCase()}_${Date.now()}`,
+        description: "",
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -65,6 +67,14 @@ export default function Canvas() {
     );
   };
 
+  const updateBlock = (index, key, value) => {
+    setBlocks((prev) =>
+      prev.map((block, i) =>
+        i === index ? { ...block, [key]: value } : block
+      )
+    );
+  };
+
   // Build OpenAPI spec + convert to YAML
   useEffect(() => {
     try {
@@ -74,19 +84,22 @@ export default function Canvas() {
       // Replace the 'paths' with the ones generated from blocks
       parsed.paths = {};
 
-      blocks.forEach(({ method, path }) => {
-        if (!parsed.paths[path]) {
-          parsed.paths[path] = {};
-        }
-        parsed.paths[path][method] = {
-          summary: `${method.toUpperCase()} ${path}`,
-          responses: {
-            "200": {
-              description: "Success",
+      blocks.forEach((block) => {
+          const { method, path } = block;
+          if (!parsed.paths[path]) {
+            parsed.paths[path] = {};
+          }
+          parsed.paths[path][method] = {
+            summary: `${method.toUpperCase()} ${path}`,
+            operationId: block.operationId,
+            description: block.description,
+            responses: {
+              "200": {
+                description: "Success",
+              },
             },
-          },
-      };
-    });
+          };
+      });
 
     setOpenapi(parsed);
 
@@ -112,15 +125,23 @@ export default function Canvas() {
           <input
             className={styles.pathInput}
             value={block.path}
-            onChange={(e) => updatePath(idx, e.target.value)}
+            onChange={(e) => updateBlock(idx, "path", e.target.value)}
+            placeholder="/new-path"
+          />
+          <input
+            className={styles.metaInput}
+            value={block.operationId}
+            onChange={(e) => updateBlock(idx, "operationId", e.target.value)}
+            placeholder="operationId"
+          />
+          <textarea
+            className={styles.metaInput}
+            value={block.description}
+            onChange={(e) => updateBlock(idx, "description", e.target.value)}
+            placeholder="Description"
           />
           <span className={styles.method}>{block.method.toUpperCase()}</span>
-          <button
-            onClick={() => deleteBlock(idx)}
-            className={styles.deleteBtn}
-          >
-            ✕
-          </button>
+          <button onClick={() => deleteBlock(idx)} className={styles.deleteBtn}>✕</button>
         </div>
       ))}
     </div>
