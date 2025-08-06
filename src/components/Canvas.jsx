@@ -37,7 +37,9 @@ export default function Canvas() {
         path: "/new-path",
         operationId: `${item.method.toLowerCase()}_${Date.now()}`,
         description: "",
-        requestSchemaRef: "", // ✅ NEW
+        responses: [
+          { status: "200", description: "Success", schemaRef: "" },
+        ],
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -70,7 +72,7 @@ export default function Canvas() {
     setBlocks((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ========== SCHEMA FUNCTIONS ==========
+  // SCHEMA METHODS
   const startNewSchema = () => {
     setEditingSchemas((prev) => [...prev, { name: "", fields: [] }]);
   };
@@ -123,40 +125,39 @@ export default function Canvas() {
     setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ========== YAML SYNC ==========
+  // YAML SYNC
   useEffect(() => {
     try {
       const parsed = yaml.load(yamlSpec);
       parsed.paths = {};
 
       blocks.forEach((block) => {
-        const { method, path, operationId, description, requestSchemaRef } = block;
+        const { method, path, operationId, description, responses = [] } = block;
+
+        const responseMap = {};
+        responses.forEach((res) => {
+          const resp = {
+            description: res.description || "",
+          };
+          if (res.schemaRef) {
+            resp.content = {
+              "application/json": {
+                schema: {
+                  $ref: `#/components/schemas/${res.schemaRef}`,
+                },
+              },
+            };
+          }
+          responseMap[res.status || "default"] = resp;
+        });
 
         if (!parsed.paths[path]) parsed.paths[path] = {};
-        const operation = {
+        parsed.paths[path][method] = {
           summary: `${method.toUpperCase()} ${path}`,
           operationId,
           description,
-          responses: {
-            "200": { description: "Success" },
-          },
+          responses: responseMap,
         };
-
-        // ✅ Add requestBody if schemaRef is present
-        if (requestSchemaRef) {
-          operation.requestBody = {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: `#/components/schemas/${requestSchemaRef}`,
-                },
-              },
-            },
-          };
-        }
-
-        parsed.paths[path][method] = operation;
       });
 
       parsed.components = parsed.components || {};
@@ -168,29 +169,28 @@ export default function Canvas() {
         const required = [];
 
         schema.fields.forEach((field) => {
-          if (field.name) {
-            required.push(field.name);
+          if (!field.name) return;
+          required.push(field.name);
 
-            if (field.type === "enum") {
+          if (field.type === "enum") {
+            properties[field.name] = {
+              type: "string",
+              enum: field.enum?.filter((v) => v?.trim()) || [],
+            };
+          } else if (field.type === "array") {
+            if (field.itemsType === "$ref" && field.ref) {
               properties[field.name] = {
-                type: "string",
-                enum: field.enum?.filter((v) => v?.trim()) || [],
+                type: "array",
+                items: { $ref: `#/components/schemas/${field.ref}` },
               };
-            } else if (field.type === "array") {
-              if (field.itemsType === "$ref" && field.ref) {
-                properties[field.name] = {
-                  type: "array",
-                  items: { $ref: `#/components/schemas/${field.ref}` },
-                };
-              } else {
-                properties[field.name] = {
-                  type: "array",
-                  items: { type: field.itemsType || "string" },
-                };
-              }
             } else {
-              properties[field.name] = { type: field.type };
+              properties[field.name] = {
+                type: "array",
+                items: { type: field.itemsType || "string" },
+              };
             }
+          } else {
+            properties[field.name] = { type: field.type };
           }
         });
 
@@ -210,7 +210,6 @@ export default function Canvas() {
 
   return (
     <div className={styles.canvasContainer}>
-      {/* Drop Area */}
       <div
         ref={drop}
         className={styles.canvas}
@@ -228,39 +227,89 @@ export default function Canvas() {
             <input
               className={styles.metaInput}
               value={block.operationId}
-              onChange={(e) => updateBlock(idx, "operationId", e.target.value)}
+              onChange={(e) =>
+                updateBlock(idx, "operationId", e.target.value)
+              }
               placeholder="operationId"
             />
             <textarea
               className={styles.metaInput}
               value={block.description}
-              onChange={(e) => updateBlock(idx, "description", e.target.value)}
+              onChange={(e) =>
+                updateBlock(idx, "description", e.target.value)
+              }
               placeholder="Description"
             />
-
-            {/* ✅ Request Schema Dropdown */}
-            <select
-              className={styles.metaInput}
-              value={block.requestSchemaRef || ""}
-              onChange={(e) => updateBlock(idx, "requestSchemaRef", e.target.value)}
-            >
-              <option value="">-- Select Request Schema --</option>
-              {schemas.map((schema) => (
-                <option key={schema.name} value={schema.name}>
-                  {schema.name}
-                </option>
-              ))}
-            </select>
-
             <span className={styles.method}>{block.method.toUpperCase()}</span>
-            <button onClick={() => deleteBlock(idx)} className={styles.deleteBtn}>
+            <button
+              onClick={() => deleteBlock(idx)}
+              className={styles.deleteBtn}
+            >
               ✕
+            </button>
+
+            {/* Custom responses */}
+            {(block.responses || []).map((res, rIdx) => (
+              <div key={rIdx} className={styles.responseRow}>
+                <input
+                  className={styles.metaInput}
+                  value={res.status}
+                  placeholder="Status Code"
+                  onChange={(e) =>
+                    updateBlock(idx, "responses", block.responses.map((r, i) =>
+                      i === rIdx ? { ...r, status: e.target.value } : r
+                    ))
+                  }
+                />
+                <input
+                  className={styles.metaInput}
+                  value={res.description}
+                  placeholder="Description"
+                  onChange={(e) =>
+                    updateBlock(idx, "responses", block.responses.map((r, i) =>
+                      i === rIdx ? { ...r, description: e.target.value } : r
+                    ))
+                  }
+                />
+                <select
+                  className={styles.metaInput}
+                  value={res.schemaRef || ""}
+                  onChange={(e) =>
+                    updateBlock(idx, "responses", block.responses.map((r, i) =>
+                      i === rIdx ? { ...r, schemaRef: e.target.value } : r
+                    ))
+                  }
+                >
+                  <option value="">-- No Schema --</option>
+                  {schemas.map((s) => (
+                    <option key={s.name} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() =>
+                    updateBlock(idx, "responses", block.responses.filter((_, i) => i !== rIdx))
+                  }
+                  className={styles.deleteBtn}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() =>
+                updateBlock(idx, "responses", [
+                  ...(block.responses || []),
+                  { status: "", description: "", schemaRef: "" },
+                ])
+              }
+              className={styles.addBtn}
+            >
+              + Add Response
             </button>
           </div>
         ))}
       </div>
 
-      {/* YAML Editor */}
       <div className={styles.specViewer}>
         <div className={styles.specHeader}>
           <h3>Generated OpenAPI YAML</h3>
@@ -274,7 +323,6 @@ export default function Canvas() {
         />
       </div>
 
-      {/* Swagger UI */}
       <div className={styles.swaggerPanel}>
         <h3>Swagger UI Preview</h3>
         {(() => {
@@ -287,7 +335,6 @@ export default function Canvas() {
         })()}
       </div>
 
-      {/* Schema Builder */}
       <SchemaBuilder
         schemas={schemas}
         editingSchemas={editingSchemas}
