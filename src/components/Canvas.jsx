@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import YamlEditor from "./YamlEditor";
 import SwaggerPreview from "./SwaggerPreview";
 import SchemaBuilder from "./SchemaBuilder";
+import EndpointBuilder from "./EndpointBuilder";
 
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
@@ -37,6 +38,8 @@ export default function Canvas() {
         path: "/new-path",
         operationId: `${item.method.toLowerCase()}_${Date.now()}`,
         description: "",
+        requestSchemaRef: "",   // ✅ add this
+        responseSchemaRef: "",  // ✅ and this
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -69,7 +72,7 @@ export default function Canvas() {
     setBlocks((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ========== SCHEMA FUNCTIONS ==========
+  // SCHEMA METHODS
   const startNewSchema = () => {
     setEditingSchemas((prev) => [...prev, { name: "", fields: [] }]);
   };
@@ -122,57 +125,118 @@ export default function Canvas() {
     setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ========== YAML SYNC ==========
+  // YAML SYNC
   useEffect(() => {
     try {
       const parsed = yaml.load(yamlSpec);
       parsed.paths = {};
 
       blocks.forEach((block) => {
-        const { method, path, operationId, description } = block;
+        const {
+          method,
+          path,
+          operationId,
+          description,
+          responses = [],
+          requestSchemaRef,
+          responseSchemaRef,
+        } = block;
+
         if (!parsed.paths[path]) parsed.paths[path] = {};
-        parsed.paths[path][method] = {
+
+        const methodObject = {
           summary: `${method.toUpperCase()} ${path}`,
           operationId,
           description,
-          responses: {
-            "200": { description: "Success" },
-          },
+          responses: {},
         };
+
+        // ✅ Request Body from selected schema
+        if (requestSchemaRef) {
+          methodObject.requestBody = {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: `#/components/schemas/${requestSchemaRef}`,
+                },
+              },
+            },
+          };
+        }
+
+        // ✅ Custom Responses
+        if (responses.length > 0) {
+          responses.forEach((res) => {
+            const resp = {
+              description: res.description || "",
+            };
+            if (res.schemaRef) {
+              resp.content = {
+                "application/json": {
+                  schema: {
+                    $ref: `#/components/schemas/${res.schemaRef}`,
+                  },
+                },
+              };
+            }
+            methodObject.responses[res.status || "default"] = resp;
+          });
+        } else if (responseSchemaRef) {
+          // ✅ Default 200 response from dropdown
+          methodObject.responses["200"] = {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: `#/components/schemas/${responseSchemaRef}`,
+                },
+              },
+            },
+          };
+        } else {
+          // ✅ Fallback response
+          methodObject.responses["200"] = {
+            description: "Success",
+          };
+        }
+
+        parsed.paths[path][method] = methodObject;
       });
 
+      // ✅ Components > Schemas
       parsed.components = parsed.components || {};
       parsed.components.schemas = {};
 
       schemas.forEach((schema) => {
         if (!schema.name) return;
+
         const properties = {};
         const required = [];
 
         schema.fields.forEach((field) => {
+          if (!field.name) return;
+          required.push(field.name);
+
           if (field.type === "enum") {
+            properties[field.name] = {
+              type: "string",
+              enum: field.enum?.filter((v) => v?.trim()) || [],
+            };
+          } else if (field.type === "array") {
+            if (field.itemsType === "$ref" && field.ref) {
               properties[field.name] = {
-                type: "string",
-                enum: field.enum?.filter((v) => v?.trim()) || [],
+                type: "array",
+                items: { $ref: `#/components/schemas/${field.ref}` },
               };
-        } else if (field.type === "array") {
-          if (field.itemsType === "$ref" && field.ref) {
-            properties[field.name] = {
-              type: "array",
-              items: {
-                $ref: `#/components/schemas/${field.ref}`,
-              },
-            };
+            } else {
+              properties[field.name] = {
+                type: "array",
+                items: { type: field.itemsType || "string" },
+              };
+            }
           } else {
-            properties[field.name] = {
-              type: "array",
-              items: {
-                type: field.itemsType || "string",
-              },
-            };
-          }
-        } else {
-          properties[field.name] = { type: field.type };
+            properties[field.name] = { type: field.type };
           }
         });
 
@@ -192,49 +256,20 @@ export default function Canvas() {
 
   return (
     <div className={styles.canvasContainer}>
-      {/* Drop Area */}
       <div
         ref={drop}
         className={styles.canvas}
         style={{ backgroundColor: isOver ? "#1e2a3a" : undefined }}
       >
         <h2>Drop here to create endpoints</h2>
-        {blocks.map((block, idx) => (
-          <div key={idx} className={styles.endpointBlock}>
-            <input
-              className={styles.pathInput}
-              value={block.path}
-              onChange={(e) => updateBlock(idx, "path", e.target.value)}
-              placeholder="/new-path"
-            />
-            <input
-              className={styles.metaInput}
-              value={block.operationId}
-              onChange={(e) =>
-                updateBlock(idx, "operationId", e.target.value)
-              }
-              placeholder="operationId"
-            />
-            <textarea
-              className={styles.metaInput}
-              value={block.description}
-              onChange={(e) =>
-                updateBlock(idx, "description", e.target.value)
-              }
-              placeholder="Description"
-            />
-            <span className={styles.method}>{block.method.toUpperCase()}</span>
-            <button
-              onClick={() => deleteBlock(idx)}
-              className={styles.deleteBtn}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+        <EndpointBuilder
+          blocks={blocks}
+          updateBlock={updateBlock}
+          deleteBlock={deleteBlock}
+          schemas={schemas} // ✅ add this
+        />
       </div>
 
-      {/* YAML Editor */}
       <div className={styles.specViewer}>
         <div className={styles.specHeader}>
           <h3>Generated OpenAPI YAML</h3>
@@ -248,7 +283,6 @@ export default function Canvas() {
         />
       </div>
 
-      {/* Swagger UI */}
       <div className={styles.swaggerPanel}>
         <h3>Swagger UI Preview</h3>
         {(() => {
@@ -261,7 +295,6 @@ export default function Canvas() {
         })()}
       </div>
 
-      {/* Schema Builder */}
       <SchemaBuilder
         schemas={schemas}
         editingSchemas={editingSchemas}
