@@ -1,34 +1,48 @@
-.canvas {
-  flex: 1;
+.canvasContainer {
+  display: flex;
+  gap: 20px;
   padding: 1rem;
-  min-height: 300px;
-  border: 2px dashed #ccc;
-  background-color: #fdfdfd;
 }
 
-.endpoint {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  margin-top: 6px;
+.canvas {
+  flex: 1;
+  min-height: 300px;
+  border: 2px dashed #ccc;
+  padding: 1rem;
+}
+
+.endpointBlock {
+  margin-top: 10px;
+  padding: 10px;
   background-color: #e9ecef;
   border-left: 4px solid #007bff;
   border-radius: 4px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .pathInput {
   flex: 1;
-  padding: 4px 8px;
-  font-size: 14px;
+  padding: 6px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
 }
 
 .method {
-  font-weight: bold;
   background-color: #007bff;
   color: white;
-  padding: 4px 10px;
+  padding: 6px 10px;
   border-radius: 4px;
 }
+
+.specViewer {
+  flex: 1;
+  background-color: #5d8dbc;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 600px;
+}
+
