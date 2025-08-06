@@ -1,0 +1,16 @@
+.sidebar {
+  width: 200px;
+  padding: 1rem;
+  background-color: #576471;
+  border-right: 1px solid #ccc;
+}
+
+.methods {
+  margin: 8px 0;
+  padding: 10px;
+  background-color: #af2b7f;
+  color: white;
+  text-align: center;
+  cursor: grab;
+  border-radius: 4px;
+}

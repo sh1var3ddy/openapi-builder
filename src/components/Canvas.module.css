@@ -1,0 +1,15 @@
+.canvas {
+  flex: 1;
+  padding: 1rem;
+  min-height: 300px;
+  border: 2px dashed #ccc;
+  background-color: #8c2d2d;
+}
+
+.endpoint {
+  padding: 8px;
+  margin-top: 6px;
+  background-color: #2a4765;
+  border-left: 4px solid #007bff;
+  border-radius: 4px;
+}
