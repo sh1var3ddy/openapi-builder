@@ -37,6 +37,7 @@ export default function Canvas() {
         path: "/new-path",
         operationId: `${item.method.toLowerCase()}_${Date.now()}`,
         description: "",
+        requestSchemaRef: "", // ✅ NEW
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -129,9 +130,10 @@ export default function Canvas() {
       parsed.paths = {};
 
       blocks.forEach((block) => {
-        const { method, path, operationId, description } = block;
+        const { method, path, operationId, description, requestSchemaRef } = block;
+
         if (!parsed.paths[path]) parsed.paths[path] = {};
-        parsed.paths[path][method] = {
+        const operation = {
           summary: `${method.toUpperCase()} ${path}`,
           operationId,
           description,
@@ -139,6 +141,22 @@ export default function Canvas() {
             "200": { description: "Success" },
           },
         };
+
+        // ✅ Add requestBody if schemaRef is present
+        if (requestSchemaRef) {
+          operation.requestBody = {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: `#/components/schemas/${requestSchemaRef}`,
+                },
+              },
+            },
+          };
+        }
+
+        parsed.paths[path][method] = operation;
       });
 
       parsed.components = parsed.components || {};
@@ -150,29 +168,29 @@ export default function Canvas() {
         const required = [];
 
         schema.fields.forEach((field) => {
-          if (field.type === "enum") {
+          if (field.name) {
+            required.push(field.name);
+
+            if (field.type === "enum") {
               properties[field.name] = {
                 type: "string",
                 enum: field.enum?.filter((v) => v?.trim()) || [],
               };
-        } else if (field.type === "array") {
-          if (field.itemsType === "$ref" && field.ref) {
-            properties[field.name] = {
-              type: "array",
-              items: {
-                $ref: `#/components/schemas/${field.ref}`,
-              },
-            };
-          } else {
-            properties[field.name] = {
-              type: "array",
-              items: {
-                type: field.itemsType || "string",
-              },
-            };
-          }
-        } else {
-          properties[field.name] = { type: field.type };
+            } else if (field.type === "array") {
+              if (field.itemsType === "$ref" && field.ref) {
+                properties[field.name] = {
+                  type: "array",
+                  items: { $ref: `#/components/schemas/${field.ref}` },
+                };
+              } else {
+                properties[field.name] = {
+                  type: "array",
+                  items: { type: field.itemsType || "string" },
+                };
+              }
+            } else {
+              properties[field.name] = { type: field.type };
+            }
           }
         });
 
@@ -210,24 +228,32 @@ export default function Canvas() {
             <input
               className={styles.metaInput}
               value={block.operationId}
-              onChange={(e) =>
-                updateBlock(idx, "operationId", e.target.value)
-              }
+              onChange={(e) => updateBlock(idx, "operationId", e.target.value)}
               placeholder="operationId"
             />
             <textarea
               className={styles.metaInput}
               value={block.description}
-              onChange={(e) =>
-                updateBlock(idx, "description", e.target.value)
-              }
+              onChange={(e) => updateBlock(idx, "description", e.target.value)}
               placeholder="Description"
             />
-            <span className={styles.method}>{block.method.toUpperCase()}</span>
-            <button
-              onClick={() => deleteBlock(idx)}
-              className={styles.deleteBtn}
+
+            {/* ✅ Request Schema Dropdown */}
+            <select
+              className={styles.metaInput}
+              value={block.requestSchemaRef || ""}
+              onChange={(e) => updateBlock(idx, "requestSchemaRef", e.target.value)}
             >
+              <option value="">-- Select Request Schema --</option>
+              {schemas.map((schema) => (
+                <option key={schema.name} value={schema.name}>
+                  {schema.name}
+                </option>
+              ))}
+            </select>
+
+            <span className={styles.method}>{block.method.toUpperCase()}</span>
+            <button onClick={() => deleteBlock(idx)} className={styles.deleteBtn}>
               ✕
             </button>
           </div>
