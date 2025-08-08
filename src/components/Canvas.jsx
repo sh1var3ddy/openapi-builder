@@ -41,6 +41,7 @@ export default function Canvas() {
         requestSchemaRef: "",   // ✅ add this
         responseSchemaRef: "",  // ✅ and this
         responses: [],
+        parameters: [],
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -151,6 +152,16 @@ export default function Canvas() {
           description,
           responses: {},
         };
+        
+        if(block.parameters && block.parameters.length > 0) {
+          methodObject.parameters = block.parameters.map(param => ({
+            name: param.name,
+            in: param.in,
+            description: param.description,
+            required: param.required,
+            schema: { type: param.type }
+          }));
+        }
 
         // ✅ Request Body from selected schema
         if (requestSchemaRef) {

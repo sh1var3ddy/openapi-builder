@@ -2,6 +2,7 @@
 
 import styles from "./Canvas.module.css";
 import ResponseEditor from "./ResponseEditor";
+import ParametersEditor from "./ParametersEditor";
 
 export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, schemas }) {
   return (
@@ -62,6 +63,13 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               </option>
             ))}
           </select>
+          
+          <ParametersEditor
+            block={block}
+            idx={idx}
+            updateBlock={updateBlock}
+          />
+
           <ResponseEditor
             block={block}
             idx={idx}
