@@ -33,6 +33,32 @@ export default function Canvas() {
     })
   );
 
+  // ✅ Load saved data on first render
+  useEffect(() => {
+    try {
+      const savedBlocks = JSON.parse(localStorage.getItem("swaggerBlocks") || "[]");
+      const savedSchemas = JSON.parse(localStorage.getItem("swaggerSchemas") || "[]");
+      const savedYaml = localStorage.getItem("swaggerYaml");
+
+      if (Array.isArray(savedBlocks) && savedBlocks.length) setBlocks(savedBlocks);
+      if (Array.isArray(savedSchemas) && savedSchemas.length) setSchemas(savedSchemas);
+      if (typeof savedYaml === "string" && savedYaml.trim()) setYamlSpec(savedYaml);
+    } catch {
+      // ignore corrupted storage
+    }
+  }, []);
+
+  // ✅ Save to localStorage whenever changes happen
+  useEffect(() => {
+    try {
+      localStorage.setItem("swaggerBlocks", JSON.stringify(blocks));
+      localStorage.setItem("swaggerSchemas", JSON.stringify(schemas));
+      localStorage.setItem("swaggerYaml", yamlSpec);
+    } catch {
+      // storage might be full or blocked; ignore for now
+    }
+  }, [blocks, schemas, yamlSpec]);
+
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "method",
     drop: (item) => {
@@ -185,9 +211,7 @@ export default function Canvas() {
 
   // ✅ One-time backfill: ensure every saved schema has a unique id
   useEffect(() => {
-    setSchemas((prev) =>
-      prev.map((s) => (s.id ? s : { ...s, id: uid() }))
-    );
+    setSchemas((prev) => prev.map((s) => (s.id ? s : { ...s, id: uid() })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
