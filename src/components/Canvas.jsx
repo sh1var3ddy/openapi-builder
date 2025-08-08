@@ -269,6 +269,13 @@ export default function Canvas() {
                 items: { type: field.itemsType || "string" },
               };
             }
+          } else if (field.type === "$ref" && field.ref) {
+            // ✅ Proper direct schema reference
+            properties[field.name] = {
+              $ref: `#/components/schemas/${field.ref}`,
+            };
+          } else if (field.type === "double") {
+            properties[field.name] = { type: "number", format: "double" };
           } else {
             properties[field.name] = { type: field.type };
           }

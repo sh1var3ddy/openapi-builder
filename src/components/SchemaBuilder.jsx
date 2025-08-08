@@ -26,7 +26,9 @@ export default function SchemaBuilder({
               <input
                 className={styles.metaInput}
                 value={field.name}
-                onChange={(e) => updateField(sIdx, fIdx, "name", e.target.value)}
+                onChange={(e) =>
+                  updateField(sIdx, fIdx, "name", e.target.value)
+                }
                 placeholder="Field Name"
               />
               <select
@@ -38,27 +40,49 @@ export default function SchemaBuilder({
                 <option value="integer">integer</option>
                 <option value="boolean">boolean</option>
                 <option value="number">number</option>
+                <option value="double">double</option>
                 <option value="enum">enum</option>
                 <option value="array">array</option>
+                <option value="$ref">Schema Reference</option>
               </select>
+
               {/* Required toggle */}
               <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <input
                   type="checkbox"
                   checked={field.required ?? true}
-                  onChange={(e) => updateField(sIdx, fIdx, "required", e.target.checked)}
+                  onChange={(e) =>
+                    updateField(sIdx, fIdx, "required", e.target.checked)
+                  }
                 />
                 Required
               </label>
 
-               {/* Delete field button */}
+              {/* Delete field button */}
               <button
-                 type="button"
-                 className={styles.deleteBtn}
-                 onClick={() => deleteField(sIdx, fIdx)}
+                type="button"
+                className={styles.deleteBtn}
+                onClick={() => deleteField(sIdx, fIdx)}
               >
-                 ✕
+                ✕
               </button>
+
+              {field.type === "$ref" && (
+                <select
+                  className={styles.metaInput}
+                  value={field.ref || ""}
+                  onChange={(e) => updateField(sIdx, fIdx, "ref", e.target.value)}
+                >
+                  <option value="">-- Select Schema --</option>
+                  {schemas
+                    .filter((s) => s.name !== schema.name)
+                    .map((s) => (
+                      <option key={s.name} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                </select>
+              )}
 
               {field.type === "enum" && (
                 <div className={styles.enumEditor}>
@@ -90,7 +114,10 @@ export default function SchemaBuilder({
                   ))}
                   <button
                     onClick={() =>
-                      updateField(sIdx, fIdx, "enum", [...(field.enum || []), ""])
+                      updateField(sIdx, fIdx, "enum", [
+                        ...(field.enum || []),
+                        "",
+                      ])
                     }
                     className={styles.addBtn}
                   >
@@ -113,6 +140,7 @@ export default function SchemaBuilder({
                     <option value="integer">integer</option>
                     <option value="boolean">boolean</option>
                     <option value="number">number</option>
+                    <option value="double">double</option>
                     <option value="$ref">Schema Reference</option>
                   </select>
 
@@ -120,16 +148,16 @@ export default function SchemaBuilder({
                     <select
                       className={styles.metaInput}
                       value={field.ref || ""}
-                      onChange={(e) =>
-                        updateField(sIdx, fIdx, "ref", e.target.value)
-                      }
+                      onChange={(e) => updateField(sIdx, fIdx, "ref", e.target.value)}
                     >
                       <option value="">-- Select Schema --</option>
-                      {schemas.map((s) => (
-                        <option key={s.name} value={s.name}>
-                          {s.name}
-                        </option>
-                      ))}
+                      {schemas
+                        .filter((s) => s.name !== schema.name)
+                        .map((s) => (
+                          <option key={s.name} value={s.name}>
+                            {s.name}
+                          </option>
+                        ))}
                     </select>
                   )}
                 </div>
