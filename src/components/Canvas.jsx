@@ -38,8 +38,10 @@ export default function Canvas() {
         path: "/new-path",
         operationId: `${item.method.toLowerCase()}_${Date.now()}`,
         description: "",
-        requestSchemaRef: "",   // ✅ add this
-        responseSchemaRef: "",  // ✅ and this
+        requestSchemaRef: "",
+        responseSchemaRef: "",
+        responses: [],
+        parameters: [],
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -89,7 +91,10 @@ export default function Canvas() {
         idx === schemaIndex
           ? {
               ...s,
-              fields: [...s.fields, { name: "", type: "string", enum: [] }],
+              fields: [
+                ...s.fields,
+                { name: "", type: "string", enum: [], required: true },
+              ],
             }
           : s
       )
@@ -151,51 +156,80 @@ export default function Canvas() {
           responses: {},
         };
 
-        // ✅ Request Body from selected schema
+        // Parameters
+        if (block.parameters && block.parameters.length > 0) {
+          methodObject.parameters = block.parameters.map((param) => ({
+            name: param.name,
+            in: param.in,
+            description: param.description,
+            required: param.required,
+            schema: { type: param.type },
+          }));
+        }
+
+        // Request Body
         if (requestSchemaRef) {
+          let schemaObj = {};
+          if (requestSchemaRef.startsWith("ref:")) {
+            schemaObj = {
+              $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}`,
+            };
+          } else if (requestSchemaRef.startsWith("type:")) {
+            const t = requestSchemaRef.replace("type:", "");
+            schemaObj =
+              t === "double"
+                ? { type: "number", format: "double" }
+                : { type: t };
+          }
           methodObject.requestBody = {
             required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: `#/components/schemas/${requestSchemaRef}`,
-                },
-              },
-            },
+            content: { "application/json": { schema: schemaObj } },
           };
         }
 
-        // ✅ Custom Responses
+        // Custom Responses
         if (responses.length > 0) {
           responses.forEach((res) => {
             const resp = {
               description: res.description || "",
             };
             if (res.schemaRef) {
-              resp.content = {
-                "application/json": {
-                  schema: {
-                    $ref: `#/components/schemas/${res.schemaRef}`,
-                  },
-                },
-              };
+              let schemaObj = {};
+              if (res.schemaRef.startsWith("ref:")) {
+                schemaObj = {
+                  $ref: `#/components/schemas/${res.schemaRef.replace("ref:", "")}`,
+                };
+              } else if (res.schemaRef.startsWith("type:")) {
+                const t = res.schemaRef.replace("type:", "");
+                schemaObj =
+                  t === "double"
+                    ? { type: "number", format: "double" }
+                    : { type: t };
+              }
+              resp.content = { "application/json": { schema: schemaObj } };
             }
             methodObject.responses[res.status || "default"] = resp;
           });
         } else if (responseSchemaRef) {
-          // ✅ Default 200 response from dropdown
+          // Default 200 response from dropdown
+          let schemaObj = {};
+          if (responseSchemaRef.startsWith("ref:")) {
+            schemaObj = {
+              $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}`,
+            };
+          } else if (responseSchemaRef.startsWith("type:")) {
+            const t = responseSchemaRef.replace("type:", "");
+            schemaObj =
+              t === "double"
+                ? { type: "number", format: "double" }
+                : { type: t };
+          }
           methodObject.responses["200"] = {
             description: "Success",
-            content: {
-              "application/json": {
-                schema: {
-                  $ref: `#/components/schemas/${responseSchemaRef}`,
-                },
-              },
-            },
+            content: { "application/json": { schema: schemaObj } },
           };
         } else {
-          // ✅ Fallback response
+          // Fallback response
           methodObject.responses["200"] = {
             description: "Success",
           };
@@ -204,7 +238,7 @@ export default function Canvas() {
         parsed.paths[path][method] = methodObject;
       });
 
-      // ✅ Components > Schemas
+      // Components > Schemas
       parsed.components = parsed.components || {};
       parsed.components.schemas = {};
 
@@ -216,7 +250,7 @@ export default function Canvas() {
 
         schema.fields.forEach((field) => {
           if (!field.name) return;
-          required.push(field.name);
+          if (field.required ?? true) required.push(field.name);
 
           if (field.type === "enum") {
             properties[field.name] = {
@@ -266,7 +300,7 @@ export default function Canvas() {
           blocks={blocks}
           updateBlock={updateBlock}
           deleteBlock={deleteBlock}
-          schemas={schemas} // ✅ add this
+          schemas={schemas}
         />
       </div>
 
