@@ -1,6 +1,6 @@
 .canvasContainer {
   display: grid;
-  grid-template-columns: 2fr 2fr 2fr;
+  grid-template-columns: 1.8fr 1.4fr 1.1fr; /* endpoints, editor, swagger */
   gap: 16px;
   padding: 20px;
   background-color: #f7f9fc;
@@ -50,7 +50,7 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  background: #ef4444;
+  background: #746161;
   color: white;
   border: none;
   border-radius: 4px;
@@ -197,6 +197,7 @@
   font-size: 14px;
   font-weight: 600;
   color: #1e293b;
+  background-color: #dee8b5;
 }
 
 .sectionBody {
@@ -247,3 +248,73 @@
   white-space: nowrap;
 }
 
+.savedList { margin-bottom: 12px; }
+.savedListHeader {
+  font-weight: 600; color: #1e293b; margin-bottom: 6px;
+}
+.savedRow {
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; background:#f8fafc; margin-bottom:6px;
+}
+.savedName { font-weight: 500; color:#0f172a; }
+.savedActions { display:flex; gap:6px; }
+.editBadge {
+  font-size: 12px; padding: 2px 6px; border-radius: 9999px;
+  background: #fde68a; color: #92400e; border: 1px solid #f59e0b;
+}
+
+.endpointSummary .deleteBtn {
+  position: static;      /* override the absolute */
+  top: auto;
+  right: auto;
+  padding: 4px 8px;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.endpointSummary {
+  grid-template-columns: auto 1fr auto !important;
+}
+
+.summaryActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deleteEndpointBtn {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Use 3 columns: method | path | actions */
+.endpointSummary {
+  grid-template-columns: auto 1fr auto;
+}
+
+.inlineDeleteBtn {
+  position: static;          /* not absolute */
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 8px;
+  align-items: center; /* add this so buttons align vertically */
+  margin-bottom: 8px;
+}
