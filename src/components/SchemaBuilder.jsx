@@ -41,6 +41,24 @@ export default function SchemaBuilder({
                 <option value="enum">enum</option>
                 <option value="array">array</option>
               </select>
+              {/* Required toggle */}
+              <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={field.required ?? true}
+                  onChange={(e) => updateField(sIdx, fIdx, "required", e.target.checked)}
+                />
+                Required
+              </label>
+
+               {/* Delete field button */}
+              <button
+                 type="button"
+                 className={styles.deleteBtn}
+                 onClick={() => deleteField(sIdx, fIdx)}
+              >
+                 ✕
+              </button>
 
               {field.type === "enum" && (
                 <div className={styles.enumEditor}>

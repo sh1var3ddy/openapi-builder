@@ -1,6 +1,7 @@
 // src/components/EndpointBuilder.jsx
 
 import styles from "./Canvas.module.css";
+import ResponseEditor from "./ResponseEditor";
 
 export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, schemas }) {
   return (
@@ -61,7 +62,12 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               </option>
             ))}
           </select>
-
+          <ResponseEditor
+            block={block}
+            idx={idx}
+            updateBlock={updateBlock}
+            schemas={schemas}
+          />
           <span className={styles.method}>{block.method.toUpperCase()}</span>
           <button
             onClick={() => deleteBlock(idx)}

@@ -40,6 +40,7 @@ export default function Canvas() {
         description: "",
         requestSchemaRef: "",   // ✅ add this
         responseSchemaRef: "",  // ✅ and this
+        responses: [],
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
@@ -89,7 +90,7 @@ export default function Canvas() {
         idx === schemaIndex
           ? {
               ...s,
-              fields: [...s.fields, { name: "", type: "string", enum: [] }],
+              fields: [...s.fields, { name: "", type: "string", enum: [], required: true }],
             }
           : s
       )
@@ -216,7 +217,7 @@ export default function Canvas() {
 
         schema.fields.forEach((field) => {
           if (!field.name) return;
-          required.push(field.name);
+          if (field.required ?? true) required.push(field.name);
 
           if (field.type === "enum") {
             properties[field.name] = {
