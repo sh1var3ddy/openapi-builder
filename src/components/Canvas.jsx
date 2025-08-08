@@ -14,6 +14,7 @@ export default function Canvas() {
   const [openapi, setOpenapi] = useState({});
   const [schemas, setSchemas] = useState([]);
   const [editingSchemas, setEditingSchemas] = useState([]);
+
   const [yamlSpec, setYamlSpec] = useState(() =>
     yaml.dump({
       openapi: "3.0.0",
@@ -66,9 +67,7 @@ export default function Canvas() {
 
   const updateBlock = (index, key, value) => {
     setBlocks((prev) =>
-      prev.map((block, i) =>
-        i === index ? { ...block, [key]: value } : block
-      )
+      prev.map((block, i) => (i === index ? { ...block, [key]: value } : block))
     );
   };
 
@@ -136,7 +135,11 @@ export default function Canvas() {
       const oldName = schemas[oldIdx].name;
       const newName = draft.name;
 
-      const updated = { id: draft.__editId, name: draft.name, fields: draft.fields };
+      const updated = {
+        id: draft.__editId,
+        name: draft.name,
+        fields: draft.fields,
+      };
       setSchemas((prev) => prev.map((s, i) => (i === oldIdx ? updated : s)));
 
       if (oldName !== newName) {
@@ -157,14 +160,22 @@ export default function Canvas() {
     if (!s) return;
     setEditingSchemas((prev) => [
       ...prev,
-      { __editId: id, name: s.name, fields: JSON.parse(JSON.stringify(s.fields || [])) },
+      {
+        __editId: id,
+        name: s.name,
+        fields: JSON.parse(JSON.stringify(s.fields || [])),
+      },
     ]);
   };
 
   const duplicateSchema = (id) => {
     const s = schemas.find((sc) => sc.id === id);
     if (!s) return;
-    const copy = { id: uid(), name: `${s.name}_copy`, fields: JSON.parse(JSON.stringify(s.fields || [])) };
+    const copy = {
+      id: uid(),
+      name: `${s.name}_copy`,
+      fields: JSON.parse(JSON.stringify(s.fields || [])),
+    };
     setSchemas((prev) => [...prev, copy]);
   };
 
@@ -172,50 +183,63 @@ export default function Canvas() {
     setSchemas((prev) => prev.filter((sc) => sc.id !== id));
   };
 
-// rename propagation for refs everywhere
+  // ✅ One-time backfill: ensure every saved schema has a unique id
+  useEffect(() => {
+    setSchemas((prev) =>
+      prev.map((s) => (s.id ? s : { ...s, id: uid() }))
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // rename propagation for refs everywhere
   const renameSchemaRefs = (oldName, newName) => {
     // endpoints (request/response + custom responses)
     setBlocks((prev) =>
       prev.map((b) => {
         const nb = { ...b };
-        if (nb.requestSchemaRef === `ref:${oldName}`) nb.requestSchemaRef = `ref:${newName}`;
-        if (nb.responseSchemaRef === `ref:${oldName}`) nb.responseSchemaRef = `ref:${newName}`;
+        if (nb.requestSchemaRef === `ref:${oldName}`)
+          nb.requestSchemaRef = `ref:${newName}`;
+        if (nb.responseSchemaRef === `ref:${oldName}`)
+          nb.responseSchemaRef = `ref:${newName}`;
         if (Array.isArray(nb.responses)) {
           nb.responses = nb.responses.map((r) =>
-            r.schemaRef === `ref:${oldName}` ? { ...r, schemaRef: `ref:${newName}` } : r
+            r.schemaRef === `ref:${oldName}`
+              ? { ...r, schemaRef: `ref:${newName}` }
+              : r
           );
         }
         return nb;
       })
     );
 
-  // other component schemas (fields + array items)
-  setSchemas((prev) =>
-    prev.map((s) => ({
-      ...s,
-      fields: (s.fields || []).map((f) => {
-        const nf = { ...f };
-        if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
-        if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName) nf.ref = newName;
-        return nf;
-      }),
-    }))
-  );
+    // other component schemas (fields + array items)
+    setSchemas((prev) =>
+      prev.map((s) => ({
+        ...s,
+        fields: (s.fields || []).map((f) => {
+          const nf = { ...f };
+          if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
+          if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName)
+            nf.ref = newName;
+          return nf;
+        }),
+      }))
+    );
 
-  // drafts currently being edited (QoL)
-  setEditingSchemas((prev) =>
-    prev.map((s) => ({
-      ...s,
-      fields: (s.fields || []).map((f) => {
-        const nf = { ...f };
-        if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
-        if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName) nf.ref = newName;
-        return nf;
-      }),
-    }))
-  );
-};
-
+    // drafts currently being edited (QoL)
+    setEditingSchemas((prev) =>
+      prev.map((s) => ({
+        ...s,
+        fields: (s.fields || []).map((f) => {
+          const nf = { ...f };
+          if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
+          if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName)
+            nf.ref = newName;
+          return nf;
+        }),
+      }))
+    );
+  };
 
   // YAML SYNC
   useEffect(() => {
@@ -264,9 +288,7 @@ export default function Canvas() {
           } else if (requestSchemaRef.startsWith("type:")) {
             const t = requestSchemaRef.replace("type:", "");
             schemaObj =
-              t === "double"
-                ? { type: "number", format: "double" }
-                : { type: t };
+              t === "double" ? { type: "number", format: "double" } : { type: t };
           }
           methodObject.requestBody = {
             required: true,
@@ -289,9 +311,7 @@ export default function Canvas() {
               } else if (res.schemaRef.startsWith("type:")) {
                 const t = res.schemaRef.replace("type:", "");
                 schemaObj =
-                  t === "double"
-                    ? { type: "number", format: "double" }
-                    : { type: t };
+                  t === "double" ? { type: "number", format: "double" } : { type: t };
               }
               resp.content = { "application/json": { schema: schemaObj } };
             }
@@ -307,9 +327,7 @@ export default function Canvas() {
           } else if (responseSchemaRef.startsWith("type:")) {
             const t = responseSchemaRef.replace("type:", "");
             schemaObj =
-              t === "double"
-                ? { type: "number", format: "double" }
-                : { type: t };
+              t === "double" ? { type: "number", format: "double" } : { type: t };
           }
           methodObject.responses["200"] = {
             description: "Success",
@@ -350,6 +368,11 @@ export default function Canvas() {
                 type: "array",
                 items: { $ref: `#/components/schemas/${field.ref}` },
               };
+            } else if (field.itemsType === "double") {
+              properties[field.name] = {
+                type: "array",
+                items: { type: "number", format: "double" },
+              };
             } else {
               properties[field.name] = {
                 type: "array",
@@ -357,7 +380,6 @@ export default function Canvas() {
               };
             }
           } else if (field.type === "$ref" && field.ref) {
-            // ✅ Proper direct schema reference
             properties[field.name] = {
               $ref: `#/components/schemas/${field.ref}`,
             };
@@ -407,10 +429,7 @@ export default function Canvas() {
             Download YAML
           </button>
         </div>
-        <YamlEditor
-          yamlText={yamlSpec}
-          onChange={(value) => setYamlSpec(value)}
-        />
+        <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
       </div>
 
       <div className={styles.swaggerPanel}>
@@ -434,9 +453,9 @@ export default function Canvas() {
         deleteField={deleteField}
         submitSchema={submitSchema}
         startNewSchema={startNewSchema}
-        startEditSchema={startEditSchema}        
-        duplicateSchema={duplicateSchema}        
-        deleteSchemaById={deleteSchemaById}      
+        startEditSchema={startEditSchema}
+        duplicateSchema={duplicateSchema}
+        deleteSchemaById={deleteSchemaById}
       />
     </div>
   );

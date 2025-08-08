@@ -27,22 +27,31 @@ export default function SchemaBuilder({
               <span className={styles.savedName}>{s.name}</span>
               <div className={styles.savedActions}>
                 <button
+                  type="button"
                   className={styles.addBtn}
                   onClick={() => startEditSchema?.(s.id)}
                 >
                   Edit
                 </button>
                 <button
+                  type="button"
                   className={styles.addBtn}
                   onClick={() => duplicateSchema?.(s.id)}
                 >
                   Duplicate
                 </button>
                 <button
-                  className={styles.deleteBtn}
-                  onClick={() => deleteSchemaById?.(s.id)}
+                  type="button"
+                  className={styles.inlineDeleteBtn}
+                  aria-label={`Delete schema ${s.name}`}
+                  title="Delete schema"
+                  onClick={() => {
+                    if (confirm(`Delete schema "${s.name}"? This cannot be undone.`)) {
+                      deleteSchemaById?.(s.id);
+                    }
+                  }}
                 >
-                  Delete
+                  ✕
                 </button>
               </div>
             </div>
@@ -102,9 +111,10 @@ export default function SchemaBuilder({
               {/* Delete field */}
               <button
                 type="button"
-                className={styles.deleteBtn}
+                className={styles.inlineDeleteBtn}
                 onClick={() => deleteField(sIdx, fIdx)}
                 title="Delete field"
+                aria-label={`Delete field ${field.name || ""}`}
               >
                 ✕
               </button>
@@ -145,12 +155,13 @@ export default function SchemaBuilder({
                         placeholder="Enum value"
                       />
                       <button
+                        type="button"
                         onClick={() => {
                           const updated = [...field.enum];
                           updated.splice(eIdx, 1);
                           updateField(sIdx, fIdx, "enum", updated);
                         }}
-                        className={styles.deleteBtn}
+                        className={styles.inlineDeleteBtn}
                         title="Remove enum value"
                       >
                         ✕
@@ -158,6 +169,7 @@ export default function SchemaBuilder({
                     </div>
                   ))}
                   <button
+                    type="button"
                     onClick={() =>
                       updateField(sIdx, fIdx, "enum", [...(field.enum || []), ""])
                     }
@@ -207,16 +219,16 @@ export default function SchemaBuilder({
             </div>
           ))}
 
-          <button onClick={() => addField(sIdx)} className={styles.addBtn}>
+          <button type="button" onClick={() => addField(sIdx)} className={styles.addBtn}>
             + Add Field
           </button>
-          <button onClick={() => submitSchema(sIdx)} className={styles.saveBtn}>
+          <button type="button" onClick={() => submitSchema(sIdx)} className={styles.saveBtn}>
             {schema.__editId ? "💾 Update Schema" : "✅ Save Schema"}
           </button>
         </div>
       ))}
 
-      <button onClick={startNewSchema} className={styles.addBtn}>
+      <button type="button" onClick={startNewSchema} className={styles.addBtn}>
         + New Schema
       </button>
     </div>
