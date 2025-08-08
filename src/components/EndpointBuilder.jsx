@@ -50,7 +50,6 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               onChange={(e) => updateBlock(idx, "description", e.target.value)}
               placeholder="Description"
             />
-
             {/* Request / Response selectors */}
             <select
               className={styles.metaInput}
@@ -72,7 +71,7 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               </optgroup>
             </select>
 
-            <select
+            {/* <select
               className={styles.metaInput}
               value={block.responseSchemaRef || ""}
               onChange={(e) => updateBlock(idx, "responseSchemaRef", e.target.value)}
@@ -90,7 +89,7 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
                   <option key={s.name} value={`ref:${s.name}`}>{s.name}</option>
                 ))}
               </optgroup>
-            </select>
+            </select> */}
 
             {/* Collapsible sections already inside body */}
             <details className={styles.section} open>
