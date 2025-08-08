@@ -31,14 +31,14 @@ export default function ResponseEditor({ block, idx, updateBlock, schemas }) {
           alignItems: "center"
         }}
       >
-        <strong>Responses</strong>
+        <strong style={{ color: "black" }}>Responses</strong>
         <button className={styles.addBtn} onClick={addResponse}>
           + Add Response
         </button>
       </div>
 
       {responses.length === 0 && (
-        <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6 }}>
+        <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6, color:"black" }}>
           No custom responses. Default 200 (if selected above) will be used.
         </div>
       )}
