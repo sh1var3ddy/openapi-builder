@@ -248,3 +248,17 @@
   white-space: nowrap;
 }
 
+.savedList { margin-bottom: 12px; }
+.savedListHeader {
+  font-weight: 600; color: #1e293b; margin-bottom: 6px;
+}
+.savedRow {
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; background:#f8fafc; margin-bottom:6px;
+}
+.savedName { font-weight: 500; color:#0f172a; }
+.savedActions { display:flex; gap:6px; }
+.editBadge {
+  font-size: 12px; padding: 2px 6px; border-radius: 9999px;
+  background: #fde68a; color: #92400e; border: 1px solid #f59e0b;
+}

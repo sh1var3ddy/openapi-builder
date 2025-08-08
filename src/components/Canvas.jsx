@@ -7,6 +7,8 @@ import SwaggerPreview from "./SwaggerPreview";
 import SchemaBuilder from "./SchemaBuilder";
 import EndpointBuilder from "./EndpointBuilder";
 
+const uid = () => Math.random().toString(36).slice(2, 9);
+
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
   const [openapi, setOpenapi] = useState({});
@@ -123,12 +125,97 @@ export default function Canvas() {
   };
 
   const submitSchema = (index) => {
-    const schema = editingSchemas[index];
-    if (!schema.name) return;
+    const draft = editingSchemas[index];
+    if (!draft.name) return;
 
-    setSchemas((prev) => [...prev, schema]);
-    setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
+    // If editing an existing saved schema
+    if (draft.__editId) {
+      const oldIdx = schemas.findIndex((s) => s.id === draft.__editId);
+      if (oldIdx === -1) return;
+
+      const oldName = schemas[oldIdx].name;
+      const newName = draft.name;
+
+      const updated = { id: draft.__editId, name: draft.name, fields: draft.fields };
+      setSchemas((prev) => prev.map((s, i) => (i === oldIdx ? updated : s)));
+
+      if (oldName !== newName) {
+        renameSchemaRefs(oldName, newName);
+      }
+
+      setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      // New schema
+      const newSchema = { id: uid(), name: draft.name, fields: draft.fields };
+      setSchemas((prev) => [...prev, newSchema]);
+      setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
+    }
   };
+
+  const startEditSchema = (id) => {
+    const s = schemas.find((sc) => sc.id === id);
+    if (!s) return;
+    setEditingSchemas((prev) => [
+      ...prev,
+      { __editId: id, name: s.name, fields: JSON.parse(JSON.stringify(s.fields || [])) },
+    ]);
+  };
+
+  const duplicateSchema = (id) => {
+    const s = schemas.find((sc) => sc.id === id);
+    if (!s) return;
+    const copy = { id: uid(), name: `${s.name}_copy`, fields: JSON.parse(JSON.stringify(s.fields || [])) };
+    setSchemas((prev) => [...prev, copy]);
+  };
+
+  const deleteSchemaById = (id) => {
+    setSchemas((prev) => prev.filter((sc) => sc.id !== id));
+  };
+
+// rename propagation for refs everywhere
+  const renameSchemaRefs = (oldName, newName) => {
+    // endpoints (request/response + custom responses)
+    setBlocks((prev) =>
+      prev.map((b) => {
+        const nb = { ...b };
+        if (nb.requestSchemaRef === `ref:${oldName}`) nb.requestSchemaRef = `ref:${newName}`;
+        if (nb.responseSchemaRef === `ref:${oldName}`) nb.responseSchemaRef = `ref:${newName}`;
+        if (Array.isArray(nb.responses)) {
+          nb.responses = nb.responses.map((r) =>
+            r.schemaRef === `ref:${oldName}` ? { ...r, schemaRef: `ref:${newName}` } : r
+          );
+        }
+        return nb;
+      })
+    );
+
+  // other component schemas (fields + array items)
+  setSchemas((prev) =>
+    prev.map((s) => ({
+      ...s,
+      fields: (s.fields || []).map((f) => {
+        const nf = { ...f };
+        if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
+        if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName) nf.ref = newName;
+        return nf;
+      }),
+    }))
+  );
+
+  // drafts currently being edited (QoL)
+  setEditingSchemas((prev) =>
+    prev.map((s) => ({
+      ...s,
+      fields: (s.fields || []).map((f) => {
+        const nf = { ...f };
+        if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
+        if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName) nf.ref = newName;
+        return nf;
+      }),
+    }))
+  );
+};
+
 
   // YAML SYNC
   useEffect(() => {
@@ -347,6 +434,9 @@ export default function Canvas() {
         deleteField={deleteField}
         submitSchema={submitSchema}
         startNewSchema={startNewSchema}
+        startEditSchema={startEditSchema}        
+        duplicateSchema={duplicateSchema}        
+        deleteSchemaById={deleteSchemaById}      
       />
     </div>
   );
