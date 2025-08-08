@@ -21,13 +21,13 @@ export default function ParametersEditor({ block, idx, updateBlock }) {
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#1e293b" }}>
         <strong>Parameters</strong>
         <button className={styles.addBtn} onClick={addParam}>+ Add Parameter</button>
       </div>
 
       {parameters.length === 0 && (
-        <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6 }}>
+        <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6,color: "#6b7280" }}>
           No parameters defined.
         </div>
       )}

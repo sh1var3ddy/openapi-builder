@@ -1,38 +1,51 @@
 // src/components/EndpointBuilder.jsx
-
-import styles from "./Canvas.module.css";
+import { useMemo } from "react";
 import ResponseEditor from "./ResponseEditor";
 import ParametersEditor from "./ParametersEditor";
+import styles from "./Canvas.module.css";
 
 export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, schemas }) {
+  // stable keys for details default open state if you want per-method defaults later
+  const defaultOpen = useMemo(() => ({ params: true, responses: true }), []);
+
   return (
     <>
       {blocks.map((block, idx) => (
         <div key={idx} className={styles.endpointBlock}>
-          <input
-            className={styles.pathInput}
-            value={block.path}
-            onChange={(e) => updateBlock(idx, "path", e.target.value)}
-            placeholder="/new-path"
-          />
+          {/* Header row: method pill + path + delete */}
+          <div className={styles.endpointHeader}>
+            <span className={styles.methodPill}>{block.method.toUpperCase()}</span>
+            <input
+              className={styles.pathInput}
+              value={block.path}
+              onChange={(e) => updateBlock(idx, "path", e.target.value)}
+              placeholder="/new-path"
+            />
+            <button
+              onClick={() => deleteBlock(idx)}
+              className={styles.deleteBtn}
+              aria-label="Delete endpoint"
+              title="Delete endpoint"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* OperationId + Description */}
           <input
             className={styles.metaInput}
             value={block.operationId}
-            onChange={(e) =>
-              updateBlock(idx, "operationId", e.target.value)
-            }
+            onChange={(e) => updateBlock(idx, "operationId", e.target.value)}
             placeholder="operationId"
           />
           <textarea
             className={styles.metaInput}
             value={block.description}
-            onChange={(e) =>
-              updateBlock(idx, "description", e.target.value)
-            }
+            onChange={(e) => updateBlock(idx, "description", e.target.value)}
             placeholder="Description"
           />
 
-          {/* Request Schema Selector */}
+          {/* Request / Response type selectors */}
           <select
             className={styles.metaInput}
             value={block.requestSchemaRef || ""}
@@ -53,7 +66,6 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
             </optgroup>
           </select>
 
-          {/* Response Schema Selector */}
           <select
             className={styles.metaInput}
             value={block.responseSchemaRef || ""}
@@ -74,25 +86,58 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
             </optgroup>
           </select>
 
-          <ParametersEditor
-            block={block}
-            idx={idx}
-            updateBlock={updateBlock}
-          />
+          {/* Collapsible: Parameters */}
+          <details open={defaultOpen.params} className={styles.section}>
+            <summary className={styles.sectionSummary}>
+              <span className={styles.sectionTitle}>Parameters</span>
+              <button
+                type="button"
+                className={styles.addBtn}
+                onClick={(e) => {
+                  e.preventDefault(); // keep details from toggling on button click
+                  const next = [...(block.parameters || []), { name: "", in: "query", required: false, description: "", type: "string" }];
+                  updateBlock(idx, "parameters", next);
+                }}
+              >
+                + Add Parameter
+              </button>
+            </summary>
 
-          <ResponseEditor
-            block={block}
-            idx={idx}
-            updateBlock={updateBlock}
-            schemas={schemas}
-          />
-          <span className={styles.method}>{block.method.toUpperCase()}</span>
-          <button
-            onClick={() => deleteBlock(idx)}
-            className={styles.deleteBtn}
-          >
-            ✕
-          </button>
+            <div className={styles.sectionBody}>
+              <ParametersEditor
+                block={block}
+                idx={idx}
+                updateBlock={updateBlock}
+              />
+            </div>
+          </details>
+
+          {/* Collapsible: Responses */}
+          <details open={defaultOpen.responses} className={styles.section}>
+            <summary className={styles.sectionSummary}>
+              <span className={styles.sectionTitle}>Responses</span>
+              <button
+                type="button"
+                className={styles.addBtn}
+                onClick={(e) => {
+                  e.preventDefault();
+                  const next = [...(block.responses || []), { status: "200", description: "", schemaRef: "" }];
+                  updateBlock(idx, "responses", next);
+                }}
+              >
+                + Add Response
+              </button>
+            </summary>
+
+            <div className={styles.sectionBody}>
+              <ResponseEditor
+                block={block}
+                idx={idx}
+                updateBlock={updateBlock}
+                schemas={schemas}
+              />
+            </div>
+          </details>
         </div>
       ))}
     </>

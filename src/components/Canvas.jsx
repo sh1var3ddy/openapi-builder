@@ -302,7 +302,9 @@ export default function Canvas() {
         className={styles.canvas}
         style={{ backgroundColor: isOver ? "#1e2a3a" : undefined }}
       >
-        <h2>Drop here to create endpoints</h2>
+        <h2 style={{ color: "#1e293b", fontWeight: "600" }}>
+          Drop here to create endpoints
+        </h2>
         <EndpointBuilder
           blocks={blocks}
           updateBlock={updateBlock}
