@@ -7,25 +7,25 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
     <>
       {blocks.map((block, idx) => (
         <details key={idx} className={styles.endpointDetails}>
-          {/* Header (summary) — compact, click to expand/collapse */}
+          {/* Collapsed header */}
           <summary className={styles.endpointSummary}>
             <span className={styles.methodPill}>{block.method.toUpperCase()}</span>
             <span className={styles.pathLabel}>{block.path || "/new-path"}</span>
-            <span className={styles.chevron} aria-hidden>▸</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault(); // don't toggle collapse when deleting
-                deleteBlock(idx);
-              }}
-              className={styles.deleteBtn}
-              title="Delete endpoint"
-            >
-              ✕
-            </button>
+
+            <div className={styles.summaryActions}>
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); deleteBlock(idx); }}
+                className={styles.deleteEndpointBtn}
+                title="Delete endpoint"
+              >
+                ✕
+              </button>
+              <span className={styles.chevron} aria-hidden>▸</span>
+            </div>
           </summary>
 
-          {/* Body — full editor */}
+          {/* Expanded body */}
           <div className={styles.endpointBody}>
             <div className={styles.endpointHeader}>
               <span className={styles.headerLabel}>Path</span>
@@ -50,7 +50,8 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               onChange={(e) => updateBlock(idx, "description", e.target.value)}
               placeholder="Description"
             />
-            {/* Request / Response selectors */}
+
+            {/* Request Schema */}
             <select
               className={styles.metaInput}
               value={block.requestSchemaRef || ""}
@@ -71,6 +72,7 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               </optgroup>
             </select>
 
+            {/* Default 200 Response Schema */}
             {/* <select
               className={styles.metaInput}
               value={block.responseSchemaRef || ""}
@@ -91,41 +93,48 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               </optgroup>
             </select> */}
 
-            {/* Collapsible sections already inside body */}
+            {/* Parameters (collapsible) */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
                 <span className={styles.sectionTitle}>Parameters</span>
-                <button
+                {/* <button
                   type="button"
                   className={styles.addBtn}
                   onClick={(e) => {
                     e.preventDefault();
-                    const next = [...(block.parameters || []), { name: "", in: "query", required: false, description: "", type: "string" }];
+                    const next = [
+                      ...(block.parameters || []),
+                      { name: "", in: "query", required: false, description: "", type: "string" },
+                    ];
                     updateBlock(idx, "parameters", next);
                   }}
                 >
                   + Add Parameter
-                </button>
+                </button> */}
               </summary>
               <div className={styles.sectionBody}>
                 <ParametersEditor block={block} idx={idx} updateBlock={updateBlock} />
               </div>
             </details>
 
+            {/* Custom Responses (collapsible) */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
                 <span className={styles.sectionTitle}>Responses</span>
-                <button
+                {/* <button
                   type="button"
                   className={styles.addBtn}
                   onClick={(e) => {
                     e.preventDefault();
-                    const next = [...(block.responses || []), { status: "200", description: "", schemaRef: "" }];
+                    const next = [
+                      ...(block.responses || []),
+                      { status: "200", description: "", schemaRef: "" },
+                    ];
                     updateBlock(idx, "responses", next);
                   }}
                 >
                   + Add Response
-                </button>
+                </button> */}
               </summary>
               <div className={styles.sectionBody}>
                 <ResponseEditor block={block} idx={idx} updateBlock={updateBlock} schemas={schemas} />

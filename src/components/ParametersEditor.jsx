@@ -14,22 +14,21 @@ export default function ParametersEditor({ block, idx, updateBlock }) {
     updateBlock(idx, "parameters", next);
   };
 
-  const deleteParam = (pIdx) => {
+  const deleteParam = (pIdx, e) => {
+    e?.preventDefault();
     const next = parameters.filter((_, i) => i !== pIdx);
     updateBlock(idx, "parameters", next);
   };
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#1e293b" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <strong>Parameters</strong>
         <button className={styles.addBtn} onClick={addParam}>+ Add Parameter</button>
       </div>
 
       {parameters.length === 0 && (
-        <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6,color: "#6b7280" }}>
-          No parameters defined.
-        </div>
+        <div className={styles.emptyMessage}>No parameters defined.</div>
       )}
 
       {parameters.map((param, pIdx) => (
@@ -68,7 +67,15 @@ export default function ParametersEditor({ block, idx, updateBlock }) {
               <option value="boolean">boolean</option>
               <option value="number">number</option>
             </select>
-            <button className={styles.deleteBtn} onClick={() => deleteParam(pIdx)}>✕</button>
+
+            {/* 👇 visible, inline delete */}
+            <button
+              className={styles.inlineDeleteBtn}
+              onClick={(e) => deleteParam(pIdx, e)}
+              title="Delete parameter"
+            >
+              ✕
+            </button>
           </div>
           <input
             className={styles.metaInput}
