@@ -617,6 +617,11 @@ export default function SchemaBuilder({
                 </button>
               </>
             )}
+            {schemaType !== "object" && (
+              <div className={styles.emptyMessage} style={{ marginTop: 8 }}>
+                Switch schema type to <strong>object</strong> to add fields.
+              </div>
+            )}
 
             <button type="button" onClick={() => submitSchema(sIdx)} className={styles.saveBtn}>
               {schema.__editId ? "💾 Update Schema" : "✅ Save Schema"}

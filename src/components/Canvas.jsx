@@ -148,7 +148,13 @@ export default function Canvas() {
       const savedDefaultTagsText = localStorage.getItem("swaggerDefaultTagsText") || "";
 
       if (Array.isArray(savedBlocks) && savedBlocks.length) setBlocks(savedBlocks);
-      if (Array.isArray(savedSchemas) && savedSchemas.length) setSchemas(savedSchemas);
+      if (Array.isArray(savedSchemas)) {
+        savedSchemas = savedSchemas.map((s) => ({
+          ...s,
+          schemaType: s?.schemaType || "object",
+          fields: (s?.fields || []).map((f) => ({ required: true, ...f })),
+        }));
+      }
       if (typeof savedYaml === "string" && savedYaml.trim()) setYamlSpec(savedYaml);
       setDefaultTagsText(savedDefaultTagsText);
     } catch {}
@@ -297,8 +303,9 @@ export default function Canvas() {
         itemsType: s.itemsType || "",
         itemsFormat: s.itemsFormat || "",
         ref: s.ref || "",
-        variants: s.variants || [], // NEW
-        fields: JSON.parse(JSON.stringify(s.fields || [])),
+        variants: s.variants || [],
+        // ✅ ensure each field gets a default required:true so the toggle shows properly
+        fields: JSON.parse(JSON.stringify(s.fields || [])).map((f) => ({ required: true, ...f })),
       },
     ]);
   };
