@@ -30,21 +30,37 @@ export default function SchemaBuilder({
   duplicateSchema,
   deleteSchemaById,
 }) {
+  // field-level composition controls (unchanged)
   const addVariant = (sIdx, fIdx) => {
     const v = { kind: "primitive", type: "string", format: "" };
     updateField(sIdx, fIdx, "variants", [ ...(editingSchemas[sIdx]?.fields?.[fIdx]?.variants || []), v ]);
   };
-
   const updateVariant = (sIdx, fIdx, vIdx, key, value) => {
     const list = [...(editingSchemas[sIdx]?.fields?.[fIdx]?.variants || [])];
     list[vIdx] = { ...list[vIdx], [key]: value };
     updateField(sIdx, fIdx, "variants", list);
   };
-
   const deleteVariant = (sIdx, fIdx, vIdx) => {
     const list = [...(editingSchemas[sIdx]?.fields?.[fIdx]?.variants || [])];
     list.splice(vIdx, 1);
     updateField(sIdx, fIdx, "variants", list);
+  };
+
+  // NEW: schema-level composition controls
+  const addSchemaVariant = (sIdx) => {
+    const v = { kind: "primitive", type: "string", format: "" };
+    const current = editingSchemas[sIdx]?.variants || [];
+    updateField(sIdx, -1, "variants", [...current, v]);
+  };
+  const updateSchemaVariant = (sIdx, vIdx, key, value) => {
+    const list = [...(editingSchemas[sIdx]?.variants || [])];
+    list[vIdx] = { ...list[vIdx], [key]: value };
+    updateField(sIdx, -1, "variants", list);
+  };
+  const deleteSchemaVariant = (sIdx, vIdx) => {
+    const list = [...(editingSchemas[sIdx]?.variants || [])];
+    list.splice(vIdx, 1);
+    updateField(sIdx, -1, "variants", list);
   };
 
   return (
@@ -88,7 +104,7 @@ export default function SchemaBuilder({
               />
               {schema.__editId && <span className={styles.editBadge}>Editing</span>}
 
-              {/* NEW: schema-level type */}
+              {/* Schema-level type */}
               <select
                 className={styles.metaInput}
                 value={schemaType}
@@ -104,6 +120,9 @@ export default function SchemaBuilder({
                 <option value="double">double</option>
                 <option value="array">array</option>
                 <option value="$ref">Schema Reference</option>
+                {/* NEW */}
+                <option value="oneOf">oneOf (union)</option>
+                <option value="anyOf">anyOf</option>
               </select>
 
               {/* Optional schema-level format for primitives/double */}
@@ -229,7 +248,88 @@ export default function SchemaBuilder({
               </div>
             )}
 
-            {/* OBJECT schema fields editor (existing UI) */}
+            {/* NEW: schema-level oneOf / anyOf editor */}
+            {(schemaType === "oneOf" || schemaType === "anyOf") && (
+              <div className={styles.schemaBlock} style={{ width: "100%" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong>{schemaType} variants</strong>
+                  <button type="button" className={styles.addBtn} onClick={() => addSchemaVariant(sIdx)}>
+                    + Add Variant
+                  </button>
+                </div>
+
+                {(schema.variants || []).length === 0 && (
+                  <div className={styles.emptyMessage}>No variants yet. Add a primitive type or a schema reference.</div>
+                )}
+
+                {(schema.variants || []).map((v, vIdx) => {
+                  const primitiveFormats = formatOptionsFor(v.type);
+                  return (
+                    <div key={vIdx} className={styles.fieldRow}>
+                      <select
+                        className={styles.metaInput}
+                        value={v.kind || "primitive"}
+                        onChange={(e) => updateSchemaVariant(sIdx, vIdx, "kind", e.target.value)}
+                        title="Variant kind"
+                      >
+                        <option value="primitive">Primitive</option>
+                        <option value="$ref">Schema Reference</option>
+                      </select>
+
+                      {v.kind !== "$ref" ? (
+                        <>
+                          <select
+                            className={styles.metaInput}
+                            value={v.type || "string"}
+                            onChange={(e) => updateSchemaVariant(sIdx, vIdx, "type", e.target.value)}
+                          >
+                            <option value="string">string</option>
+                            <option value="integer">integer</option>
+                            <option value="boolean">boolean</option>
+                            <option value="number">number</option>
+                            <option value="double">double</option>
+                          </select>
+
+                          <select
+                            className={styles.metaInput}
+                            value={v.format || ""}
+                            onChange={(e) => updateSchemaVariant(sIdx, vIdx, "format", e.target.value)}
+                          >
+                            {primitiveFormats.map((opt) => (
+                              <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
+                            ))}
+                          </select>
+                        </>
+                      ) : (
+                        <select
+                          className={styles.metaInput}
+                          value={v.ref || ""}
+                          onChange={(e) => updateSchemaVariant(sIdx, vIdx, "ref", e.target.value)}
+                        >
+                          <option value="">-- Select Schema --</option>
+                          {(schemas || [])
+                            .filter((s) => s.name !== schema.name)
+                            .map((s) => (
+                              <option key={s.name} value={s.name}>{s.name}</option>
+                            ))}
+                        </select>
+                      )}
+
+                      <button
+                        type="button"
+                        className={styles.inlineDeleteBtn}
+                        onClick={() => deleteSchemaVariant(sIdx, vIdx)}
+                        title="Remove variant"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* OBJECT schema fields editor (with field-level oneOf/anyOf preserved) */}
             {schemaType === "object" && (
               <>
                 {(schema.fields ?? []).map((field, fIdx) => {
@@ -264,7 +364,6 @@ export default function SchemaBuilder({
                         <option value="enum">enum</option>
                         <option value="array">array</option>
                         <option value="$ref">Schema Reference</option>
-                        {/* NEW */}
                         <option value="oneOf">oneOf (union)</option>
                         <option value="anyOf">anyOf</option>
                       </select>
@@ -290,7 +389,7 @@ export default function SchemaBuilder({
                         ✕
                       </button>
 
-                      {/* Description (optional) */}
+                      {/* Description */}
                       <input
                         className={styles.metaInput}
                         value={field.description || ""}
@@ -429,7 +528,7 @@ export default function SchemaBuilder({
                         </div>
                       )}
 
-                      {/* oneOf / anyOf editor */}
+                      {/* oneOf / anyOf editor (field-level) */}
                       {isComposition && (
                         <div className={styles.schemaBlock} style={{ width: "100%" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
