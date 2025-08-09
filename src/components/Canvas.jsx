@@ -1,3 +1,4 @@
+// src/components/Canvas.jsx
 import { useDrop } from "react-dnd";
 import { useState, useEffect } from "react";
 import styles from "./Canvas.module.css";
@@ -14,22 +15,35 @@ export default function Canvas() {
   const [openapi, setOpenapi] = useState({});
   const [schemas, setSchemas] = useState([]);
   const [editingSchemas, setEditingSchemas] = useState([]);
+  const [defaultTagsText, setDefaultTagsText] = useState(""); // ✅ default tags UI string
+
+  const parseTags = (txt) =>
+    String(txt || "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
 
   const clearWorkspace = () => {
-  if (!confirm("Clear all endpoints, schemas, and YAML? This can’t be undone.")) return;
-  setBlocks([]);
-  setSchemas([]);
-  setEditingSchemas([]);
-  setYamlSpec(yaml.dump({
-    openapi: "3.0.0",
-    info: { title: "Swagger Builder API", version: "1.0.0", description: "Generated using drag-and-drop builder" },
-    servers: [{ url: "http://localhost:8080/api", description: "Development server" }],
-    paths: {},
-  }));
-  // also nuke localStorage
-  localStorage.removeItem("swaggerBlocks");
-  localStorage.removeItem("swaggerSchemas");
-  localStorage.removeItem("swaggerYaml");
+    if (!confirm("Clear all endpoints, schemas, and YAML? This can’t be undone.")) return;
+    setBlocks([]);
+    setSchemas([]);
+    setEditingSchemas([]);
+    setYamlSpec(
+      yaml.dump({
+        openapi: "3.0.0",
+        info: {
+          title: "Swagger Builder API",
+          version: "1.0.0",
+          description: "Generated using drag-and-drop builder",
+        },
+        servers: [{ url: "http://localhost:8080/api", description: "Development server" }],
+        paths: {},
+      })
+    );
+    localStorage.removeItem("swaggerBlocks");
+    localStorage.removeItem("swaggerSchemas");
+    localStorage.removeItem("swaggerYaml");
+    localStorage.removeItem("swaggerDefaultTagsText");
   };
 
   const duplicateBlock = (index) => {
@@ -70,10 +84,12 @@ export default function Canvas() {
       const savedBlocks = JSON.parse(localStorage.getItem("swaggerBlocks") || "[]");
       const savedSchemas = JSON.parse(localStorage.getItem("swaggerSchemas") || "[]");
       const savedYaml = localStorage.getItem("swaggerYaml");
+      const savedDefaultTagsText = localStorage.getItem("swaggerDefaultTagsText") || "";
 
       if (Array.isArray(savedBlocks) && savedBlocks.length) setBlocks(savedBlocks);
       if (Array.isArray(savedSchemas) && savedSchemas.length) setSchemas(savedSchemas);
       if (typeof savedYaml === "string" && savedYaml.trim()) setYamlSpec(savedYaml);
+      setDefaultTagsText(savedDefaultTagsText);
     } catch {
       // ignore corrupted storage
     }
@@ -85,10 +101,11 @@ export default function Canvas() {
       localStorage.setItem("swaggerBlocks", JSON.stringify(blocks));
       localStorage.setItem("swaggerSchemas", JSON.stringify(schemas));
       localStorage.setItem("swaggerYaml", yamlSpec);
+      localStorage.setItem("swaggerDefaultTagsText", defaultTagsText);
     } catch {
       // storage might be full or blocked; ignore for now
     }
-  }, [blocks, schemas, yamlSpec]);
+  }, [blocks, schemas, yamlSpec, defaultTagsText]);
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "method",
@@ -123,9 +140,7 @@ export default function Canvas() {
   };
 
   const updateBlock = (index, key, value) => {
-    setBlocks((prev) =>
-      prev.map((block, i) => (i === index ? { ...block, [key]: value } : block))
-    );
+    setBlocks((prev) => prev.map((block, i) => (i === index ? { ...block, [key]: value } : block)));
   };
 
   const deleteBlock = (index) => {
@@ -138,9 +153,7 @@ export default function Canvas() {
   };
 
   const updateSchemaName = (i, name) => {
-    setEditingSchemas((prev) =>
-      prev.map((s, idx) => (idx === i ? { ...s, name } : s))
-    );
+    setEditingSchemas((prev) => prev.map((s, idx) => (idx === i ? { ...s, name } : s)));
   };
 
   const addField = (schemaIndex) => {
@@ -149,10 +162,7 @@ export default function Canvas() {
         idx === schemaIndex
           ? {
               ...s,
-              fields: [
-                ...s.fields,
-                { name: "", type: "string", enum: [], required: true },
-              ],
+              fields: [...s.fields, { name: "", type: "string", enum: [], required: true }],
             }
           : s
       )
@@ -184,28 +194,22 @@ export default function Canvas() {
     const draft = editingSchemas[index];
     if (!draft.name) return;
 
-    // If editing an existing saved schema
     if (draft.__editId) {
+      // update existing
       const oldIdx = schemas.findIndex((s) => s.id === draft.__editId);
       if (oldIdx === -1) return;
 
       const oldName = schemas[oldIdx].name;
       const newName = draft.name;
 
-      const updated = {
-        id: draft.__editId,
-        name: draft.name,
-        fields: draft.fields,
-      };
+      const updated = { id: draft.__editId, name: draft.name, fields: draft.fields };
       setSchemas((prev) => prev.map((s, i) => (i === oldIdx ? updated : s)));
 
-      if (oldName !== newName) {
-        renameSchemaRefs(oldName, newName);
-      }
+      if (oldName !== newName) renameSchemaRefs(oldName, newName);
 
       setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
     } else {
-      // New schema
+      // new
       const newSchema = { id: uid(), name: draft.name, fields: draft.fields };
       setSchemas((prev) => [...prev, newSchema]);
       setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
@@ -217,17 +221,12 @@ export default function Canvas() {
     if (!s) return;
     setEditingSchemas((prev) => [
       ...prev,
-      {
-        __editId: id,
-        name: s.name,
-        fields: JSON.parse(JSON.stringify(s.fields || [])),
-      },
+      { __editId: id, name: s.name, fields: JSON.parse(JSON.stringify(s.fields || [])) },
     ]);
   };
 
   const ensureUniqueSchemaName = (base, existingNames) => {
     if (!existingNames.includes(base)) return base;
-    // try _copy, _copy2, _copy3...
     let i = 1;
     let candidate = `${base}_copy`;
     while (existingNames.includes(candidate)) {
@@ -245,21 +244,12 @@ export default function Canvas() {
       const existingNames = prev.map((p) => p.name);
       const newName = ensureUniqueSchemaName(src.name, existingNames);
 
-      const copy = {
-        id: uid(),
-        name: newName,
-        fields: JSON.parse(JSON.stringify(src.fields || [])),
-      };
+      const copy = { id: uid(), name: newName, fields: JSON.parse(JSON.stringify(src.fields || [])) };
       const next = [...prev, copy];
-
-      // optionally open it for editing right away
-      if (edit) {
-        // defer to next tick so setState is applied
-        setTimeout(() => startEditSchema(copy.id), 0);
-      }
+      if (edit) setTimeout(() => startEditSchema(copy.id), 0);
       return next;
     });
-  }
+  };
 
   const deleteSchemaById = (id) => {
     setSchemas((prev) => prev.filter((sc) => sc.id !== id));
@@ -273,48 +263,40 @@ export default function Canvas() {
 
   // rename propagation for refs everywhere
   const renameSchemaRefs = (oldName, newName) => {
-    // endpoints (request/response + custom responses)
+    // endpoints
     setBlocks((prev) =>
       prev.map((b) => {
         const nb = { ...b };
-        if (nb.requestSchemaRef === `ref:${oldName}`)
-          nb.requestSchemaRef = `ref:${newName}`;
-        if (nb.responseSchemaRef === `ref:${oldName}`)
-          nb.responseSchemaRef = `ref:${newName}`;
+        if (nb.requestSchemaRef === `ref:${oldName}`) nb.requestSchemaRef = `ref:${newName}`;
+        if (nb.responseSchemaRef === `ref:${oldName}`) nb.responseSchemaRef = `ref:${newName}`;
         if (Array.isArray(nb.responses)) {
           nb.responses = nb.responses.map((r) =>
-            r.schemaRef === `ref:${oldName}`
-              ? { ...r, schemaRef: `ref:${newName}` }
-              : r
+            r.schemaRef === `ref:${oldName}` ? { ...r, schemaRef: `ref:${newName}` } : r
           );
         }
         return nb;
       })
     );
-
-    // other component schemas (fields + array items)
+    // component schemas
     setSchemas((prev) =>
       prev.map((s) => ({
         ...s,
         fields: (s.fields || []).map((f) => {
           const nf = { ...f };
           if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
-          if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName)
-            nf.ref = newName;
+          if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName) nf.ref = newName;
           return nf;
         }),
       }))
     );
-
-    // drafts currently being edited (QoL)
+    // drafts
     setEditingSchemas((prev) =>
       prev.map((s) => ({
         ...s,
         fields: (s.fields || []).map((f) => {
           const nf = { ...f };
           if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
-          if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName)
-            nf.ref = newName;
+          if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName) nf.ref = newName;
           return nf;
         }),
       }))
@@ -347,6 +329,13 @@ export default function Canvas() {
           responses: {},
         };
 
+        // ✅ Tags: endpoint-specific or fallback to default
+        const defaultTags = parseTags(defaultTagsText);
+        const opTags = Array.isArray(block.tags) ? block.tags : parseTags(block.tagsText || "");
+        if ((opTags && opTags.length) || defaultTags.length) {
+          methodObject.tags = opTags && opTags.length ? opTags : defaultTags;
+        }
+
         // Parameters
         if (block.parameters && block.parameters.length > 0) {
           methodObject.parameters = block.parameters.map((param) => ({
@@ -362,13 +351,10 @@ export default function Canvas() {
         if (requestSchemaRef) {
           let schemaObj = {};
           if (requestSchemaRef.startsWith("ref:")) {
-            schemaObj = {
-              $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}`,
-            };
+            schemaObj = { $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}` };
           } else if (requestSchemaRef.startsWith("type:")) {
             const t = requestSchemaRef.replace("type:", "");
-            schemaObj =
-              t === "double" ? { type: "number", format: "double" } : { type: t };
+            schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
           }
           methodObject.requestBody = {
             required: true,
@@ -379,35 +365,27 @@ export default function Canvas() {
         // Custom Responses
         if (responses.length > 0) {
           responses.forEach((res) => {
-            const resp = {
-              description: res.description || "",
-            };
+            const resp = { description: res.description || "" };
             if (res.schemaRef) {
               let schemaObj = {};
               if (res.schemaRef.startsWith("ref:")) {
-                schemaObj = {
-                  $ref: `#/components/schemas/${res.schemaRef.replace("ref:", "")}`,
-                };
+                schemaObj = { $ref: `#/components/schemas/${res.schemaRef.replace("ref:", "")}` };
               } else if (res.schemaRef.startsWith("type:")) {
                 const t = res.schemaRef.replace("type:", "");
-                schemaObj =
-                  t === "double" ? { type: "number", format: "double" } : { type: t };
+                schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
               }
               resp.content = { "application/json": { schema: schemaObj } };
             }
             methodObject.responses[res.status || "default"] = resp;
           });
         } else if (responseSchemaRef) {
-          // Default 200 response from dropdown
+          // Default 200 response
           let schemaObj = {};
           if (responseSchemaRef.startsWith("ref:")) {
-            schemaObj = {
-              $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}`,
-            };
+            schemaObj = { $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}` };
           } else if (responseSchemaRef.startsWith("type:")) {
             const t = responseSchemaRef.replace("type:", "");
-            schemaObj =
-              t === "double" ? { type: "number", format: "double" } : { type: t };
+            schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
           }
           methodObject.responses["200"] = {
             description: "Success",
@@ -415,9 +393,7 @@ export default function Canvas() {
           };
         } else {
           // Fallback response
-          methodObject.responses["200"] = {
-            description: "Success",
-          };
+          methodObject.responses["200"] = { description: "Success" };
         }
 
         parsed.paths[path][method] = methodObject;
@@ -460,9 +436,7 @@ export default function Canvas() {
               };
             }
           } else if (field.type === "$ref" && field.ref) {
-            properties[field.name] = {
-              $ref: `#/components/schemas/${field.ref}`,
-            };
+            properties[field.name] = { $ref: `#/components/schemas/${field.ref}` };
           } else if (field.type === "double") {
             properties[field.name] = { type: "number", format: "double" };
           } else {
@@ -477,12 +451,21 @@ export default function Canvas() {
         };
       });
 
+      // ✅ Top-level tags array for Swagger UI groups
+      const allTagNames = new Set();
+      Object.values(parsed.paths || {}).forEach((pathItem) => {
+        Object.values(pathItem || {}).forEach((op) => {
+          if (op && Array.isArray(op.tags)) op.tags.forEach((t) => allTagNames.add(t));
+        });
+      });
+      parsed.tags = Array.from(allTagNames).map((name) => ({ name }));
+
       setOpenapi(parsed);
       setYamlSpec(yaml.dump(parsed));
     } catch (e) {
       console.error("Failed to parse or update YAML", e);
     }
-  }, [blocks, schemas]);
+  }, [blocks, schemas, defaultTagsText]); // ✅ watch defaultTagsText
 
   return (
     <div className={styles.canvasContainer}>
@@ -491,9 +474,7 @@ export default function Canvas() {
         className={styles.canvas}
         style={{ backgroundColor: isOver ? "#1e2a3a" : undefined }}
       >
-        <h2 style={{ color: "#1e293b", fontWeight: "600" }}>
-          Drop here to create endpoints
-        </h2>
+        <h2 style={{ color: "#1e293b", fontWeight: "600" }}>Drop here to create endpoints</h2>
         <EndpointBuilder
           blocks={blocks}
           updateBlock={updateBlock}
@@ -506,9 +487,22 @@ export default function Canvas() {
       <div className={styles.specViewer}>
         <div className={styles.specHeader}>
           <h3>Generated OpenAPI YAML</h3>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={downloadYaml} className={styles.downloadBtn}>Download YAML</button>
-            <button onClick={clearWorkspace} className={styles.deleteEndpointBtn}>Clear</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* ✅ Default tags input */}
+            <input
+              className={styles.metaInput}
+              style={{ width: 220 }}
+              placeholder="Default Tags (comma-separated)"
+              value={defaultTagsText}
+              onChange={(e) => setDefaultTagsText(e.target.value)}
+              title="These tags apply to endpoints that don't define their own"
+            />
+            <button onClick={downloadYaml} className={styles.downloadBtn}>
+              Download YAML
+            </button>
+            <button onClick={clearWorkspace} className={styles.deleteEndpointBtn}>
+              Clear
+            </button>
           </div>
         </div>
         <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
