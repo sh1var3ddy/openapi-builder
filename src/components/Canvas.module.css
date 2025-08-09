@@ -1,9 +1,43 @@
 .canvasContainer {
   display: grid;
-  grid-template-columns: 1.8fr 1.4fr 1.1fr; /* endpoints, editor, swagger */
-  gap: 16px;
-  padding: 20px;
-  background-color: #f7f9fc;
+  grid-template-rows: 1fr auto; /* top takes remaining height, bottom auto */
+  gap: 12px;
+  height: 100vh;        /* or 100% if you manage height elsewhere */
+  min-height: 0;        /* allow children to shrink */
+  padding: 12px;        /* optional */
+  box-sizing: border-box;
+}
+
+/* Top row: three columns */
+.topRowGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr; /* tweak ratios as you like */
+  gap: 12px;
+  min-height: 0; /* critical for nested overflow */
+}
+
+/* Bottom row: schema builder full width */
+.bottomRow {
+  /* Give it some height; adjust as you like */
+  max-height: 40vh;         /* optional: cap, or remove for natural height */
+  overflow: auto;           /* scroll if it grows */
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+
+/* Ensure panels can scroll within their grid cells */
+.canvas,
+.specViewer,
+.swaggerPanel {
+  min-height: 0;   /* critical for child overflow to work in a grid */
+  overflow: auto;  /* so each panel scrolls independently */
+}
+
+/* If SwaggerPreview had a fixed max-height, let it stretch */
+.swaggerPanel :global(.swagger-ui) {
+  height: 100%;
 }
 
 .canvas {

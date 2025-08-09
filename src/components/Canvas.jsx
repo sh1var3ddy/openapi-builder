@@ -517,70 +517,63 @@ export default function Canvas() {
 
   return (
     <div className={styles.canvasContainer}>
-      <div
-        ref={drop}
-        className={styles.canvas}
-        style={{ backgroundColor: isOver ? "#1e2a3a" : undefined }}
-      >
-        <h2 style={{ color: "#1e293b", fontWeight: "600" }}>Drop here to create endpoints</h2>
-        <EndpointBuilder
-          blocks={blocks}
-          updateBlock={updateBlock}
-          deleteBlock={deleteBlock}
+      {/* TOP ROW: 3 columns */}
+      <div className={styles.topRowGrid}>
+        <div
+          ref={drop}
+          className={styles.canvas}
+          style={{ backgroundColor: isOver ? "#1e2a3a" : undefined }}
+        >
+          <h2 style={{ color: "#1e293b", fontWeight: "600" }}>Drop here to create endpoints</h2>
+          <EndpointBuilder
+            blocks={blocks}
+            updateBlock={updateBlock}
+            deleteBlock={deleteBlock}
+            schemas={schemas}
+            duplicateBlock={duplicateBlock}
+          />
+        </div>
+
+        <div className={styles.specViewer}>
+          <div className={styles.specHeader}>
+            <h3>Generated OpenAPI YAML</h3>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button onClick={downloadYaml} className={styles.downloadBtn}>Download YAML</button>
+              <button onClick={clearWorkspace} className={styles.deleteEndpointBtn}>Clear</button>
+            </div>
+          </div>
+          <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
+        </div>
+
+        <div className={styles.swaggerPanel}>
+          <h3>Swagger UI Preview</h3>
+          {(() => {
+            try {
+              const parsedSpec = yaml.load(yamlSpec);
+              return <SwaggerPreview spec={parsedSpec} />;
+            } catch {
+              return <p style={{ color: "red" }}>Invalid YAML</p>;
+            }
+          })()}
+        </div>
+      </div>
+
+      {/* BOTTOM ROW: full-width SchemaBuilder */}
+      <div className={styles.bottomRow}>
+        <SchemaBuilder
           schemas={schemas}
-          duplicateBlock={duplicateBlock}
+          editingSchemas={editingSchemas}
+          updateSchemaName={updateSchemaName}
+          addField={addField}
+          updateField={updateField}
+          deleteField={deleteField}
+          submitSchema={submitSchema}
+          startNewSchema={startNewSchema}
+          startEditSchema={startEditSchema}
+          duplicateSchema={duplicateSchema}
+          deleteSchemaById={deleteSchemaById}
         />
       </div>
-
-      <div className={styles.specViewer}>
-        <div className={styles.specHeader}>
-          <h3>Generated OpenAPI YAML</h3>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {/* ✅ Default tags input */}
-            {/* <input
-              className={styles.metaInput}
-              style={{ width: 220 }}
-              placeholder="Default Tags (comma-separated)"
-              value={defaultTagsText}
-              onChange={(e) => setDefaultTagsText(e.target.value)}
-              title="These tags apply to endpoints that don't define their own"
-            /> */}
-            <button onClick={downloadYaml} className={styles.downloadBtn}>
-              Download YAML
-            </button>
-            <button onClick={clearWorkspace} className={styles.deleteEndpointBtn}>
-              Clear
-            </button>
-          </div>
-        </div>
-        <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
-      </div>
-
-      <div className={styles.swaggerPanel}>
-        <h3>Swagger UI Preview</h3>
-        {(() => {
-          try {
-            const parsedSpec = yaml.load(yamlSpec);
-            return <SwaggerPreview spec={parsedSpec} />;
-          } catch (err) {
-            return <p style={{ color: "red" }}>Invalid YAML</p>;
-          }
-        })()}
-      </div>
-
-      <SchemaBuilder
-        schemas={schemas}
-        editingSchemas={editingSchemas}
-        updateSchemaName={updateSchemaName}
-        addField={addField}
-        updateField={updateField}
-        deleteField={deleteField}
-        submitSchema={submitSchema}
-        startNewSchema={startNewSchema}
-        startEditSchema={startEditSchema}
-        duplicateSchema={duplicateSchema}
-        deleteSchemaById={deleteSchemaById}
-      />
     </div>
   );
 }
