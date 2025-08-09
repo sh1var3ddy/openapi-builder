@@ -10,6 +10,76 @@ import EndpointBuilder from "./EndpointBuilder";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+/* ---------- Import helpers ---------- */
+// Map an OpenAPI schema node into our selector string: "ref:Name" | "type:string" | "type:number" | "type:double" | ""
+const toSelector = (node) => {
+  if (!node || typeof node !== "object") return "";
+  if (node.$ref) {
+    const name = node.$ref.split("/").pop();
+    return `ref:${name}`;
+  }
+  if (node.type === "number" && node.format === "double") return "type:double";
+  if (node.type) return `type:${node.type}`;
+  return "";
+};
+
+// Map a component property schema into our schema-field model
+const toField = (propName, node, requiredList = []) => {
+  const base = {
+    name: propName,
+    type: "string",
+    enum: [],
+    required: requiredList.includes(propName),
+    description: node?.description || "",
+    format: node?.format || "",
+  };
+  if (!node) return base;
+
+  // oneOf / anyOf
+  if (node.oneOf || node.anyOf) {
+    const keyword = node.oneOf ? "oneOf" : "anyOf";
+    const variants = (node[keyword] || []).map((v) => {
+      if (v?.$ref) return { kind: "$ref", ref: v.$ref.split("/").pop() };
+      if (v?.type === "number" && v?.format === "double")
+        return { kind: "primitive", type: "double", format: "double" };
+      return { kind: "primitive", type: v?.type || "string", format: v?.format || "" };
+    });
+    return { ...base, type: keyword, variants };
+  }
+
+  // $ref
+  if (node.$ref) {
+    return { ...base, type: "$ref", ref: node.$ref.split("/").pop(), format: "" };
+  }
+
+  // enum
+  if (Array.isArray(node.enum)) {
+    return { ...base, type: "enum", enum: node.enum.map(String), format: "" };
+  }
+
+  // array
+  if (node.type === "array") {
+    const items = node.items || {};
+    if (items.$ref) {
+      return { ...base, type: "array", itemsType: "$ref", ref: items.$ref.split("/").pop(), itemsFormat: "", format: "" };
+    }
+    if (items.type === "number" && items.format === "double") {
+      return { ...base, type: "array", itemsType: "double", itemsFormat: "double", format: "" };
+    }
+    return { ...base, type: "array", itemsType: items.type || "string", itemsFormat: items.format || "", format: "" };
+  }
+
+  // primitives
+  if (node.type === "number" && node.format === "double") {
+    return { ...base, type: "double", format: "double" };
+  }
+  if (node.type) {
+    return { ...base, type: node.type, format: node.format || "" };
+  }
+  return base;
+};
+/* ------------------------------------ */
+
 export default function Canvas() {
   const [blocks, setBlocks] = useState([]);
   const [openapi, setOpenapi] = useState({});
@@ -31,11 +101,7 @@ export default function Canvas() {
     setYamlSpec(
       yaml.dump({
         openapi: "3.0.0",
-        info: {
-          title: "Swagger Builder API",
-          version: "1.0.0",
-          description: "Generated using drag-and-drop builder",
-        },
+        info: { title: "Swagger Builder API", version: "1.0.0", description: "Generated using drag-and-drop builder" },
         servers: [{ url: "http://localhost:8080/api", description: "Development server" }],
         paths: {},
       })
@@ -52,7 +118,7 @@ export default function Canvas() {
       if (!src) return prev;
       const clone = {
         ...JSON.parse(JSON.stringify(src)),
-        operationId: `${src.method}_${Date.now()}`, // new opId
+        operationId: `${src.method}_${Date.now()}`,
       };
       const next = [...prev];
       next.splice(index + 1, 0, clone);
@@ -68,12 +134,7 @@ export default function Canvas() {
         version: "1.0.0",
         description: "Generated using drag-and-drop builder",
       },
-      servers: [
-        {
-          url: "http://localhost:8080/api",
-          description: "Development server",
-        },
-      ],
+      servers: [{ url: "http://localhost:8080/api", description: "Development server" }],
       paths: {},
     })
   );
@@ -122,9 +183,7 @@ export default function Canvas() {
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-    }),
+    collect: (monitor) => ({ isOver: monitor.isOver() }),
   }));
 
   const downloadYaml = () => {
@@ -148,28 +207,16 @@ export default function Canvas() {
   };
 
   // SCHEMA METHODS
-  const startNewSchema = () => {
-    setEditingSchemas((prev) => [...prev, { name: "", fields: [] }]);
-  };
-
-  const updateSchemaName = (i, name) => {
+  const startNewSchema = () => setEditingSchemas((prev) => [...prev, { name: "", fields: [] }]);
+  const updateSchemaName = (i, name) =>
     setEditingSchemas((prev) => prev.map((s, idx) => (idx === i ? { ...s, name } : s)));
-  };
-
-  const addField = (schemaIndex) => {
+  const addField = (schemaIndex) =>
     setEditingSchemas((prev) =>
       prev.map((s, idx) =>
-        idx === schemaIndex
-          ? {
-              ...s,
-              fields: [...s.fields, { name: "", type: "string", enum: [], required: true }],
-            }
-          : s
+        idx === schemaIndex ? { ...s, fields: [...s.fields, { name: "", type: "string", enum: [], required: true }] } : s
       )
     );
-  };
-
-  const updateField = (sIdx, fIdx, key, value) => {
+  const updateField = (sIdx, fIdx, key, value) =>
     setEditingSchemas((prev) =>
       prev.map((schema, i) => {
         if (i !== sIdx) return schema;
@@ -178,9 +225,7 @@ export default function Canvas() {
         return { ...schema, fields };
       })
     );
-  };
-
-  const deleteField = (sIdx, fIdx) => {
+  const deleteField = (sIdx, fIdx) =>
     setEditingSchemas((prev) =>
       prev.map((schema, i) => {
         if (i !== sIdx) return schema;
@@ -188,7 +233,6 @@ export default function Canvas() {
         return { ...schema, fields };
       })
     );
-  };
 
   const submitSchema = (index) => {
     const draft = editingSchemas[index];
@@ -251,9 +295,7 @@ export default function Canvas() {
     });
   };
 
-  const deleteSchemaById = (id) => {
-    setSchemas((prev) => prev.filter((sc) => sc.id !== id));
-  };
+  const deleteSchemaById = (id) => setSchemas((prev) => prev.filter((sc) => sc.id !== id));
 
   // ✅ One-time backfill: ensure every saved schema has a unique id
   useEffect(() => {
@@ -303,6 +345,103 @@ export default function Canvas() {
     );
   };
 
+  /* ---------- Import: handlers ---------- */
+  const onImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const spec = file.name.endsWith(".json") ? JSON.parse(text) : yaml.load(text);
+      importOpenAPISpec(spec);
+    } catch (err) {
+      alert("Failed to read/parse file. Make sure it's valid OpenAPI YAML or JSON.");
+      console.error(err);
+    } finally {
+      e.target.value = ""; // allow re-selecting same file
+    }
+  };
+
+  const importOpenAPISpec = (spec) => {
+    if (!spec || typeof spec !== "object") return;
+
+    // Schemas
+    const importedSchemas = [];
+    const compSchemas = spec.components?.schemas || {};
+    Object.entries(compSchemas).forEach(([name, schema]) => {
+      const props = schema?.properties || {};
+      const requiredList = schema?.required || [];
+      const fields = Object.entries(props).map(([propName, node]) => toField(propName, node, requiredList));
+      importedSchemas.push({ id: uid(), name, fields });
+    });
+
+    // Paths -> Blocks
+    const importedBlocks = [];
+    const paths = spec.paths || {};
+    Object.entries(paths).forEach(([path, methods]) => {
+      Object.entries(methods || {}).forEach(([method, op]) => {
+        const m = method.toLowerCase();
+        if (!["get", "post", "put", "patch", "delete", "head", "options"].includes(m)) return;
+
+        const params = (op.parameters || []).map((p) => ({
+          name: p.name || "",
+          in: p.in || "query",
+          required: !!p.required,
+          description: p.description || "",
+          type:
+            p.schema?.type === "number" && p.schema?.format === "double"
+              ? "double"
+              : (p.schema?.type || "string"),
+        }));
+
+        const reqSchema =
+          op.requestBody?.content?.["application/json"]?.schema ||
+          op.requestBody?.content?.["application/x-www-form-urlencoded"]?.schema ||
+          null;
+
+        const resp200 = op.responses?.["200"]?.content?.["application/json"]?.schema || null;
+
+        const customResps = Object.entries(op.responses || {})
+          .filter(([code]) => code !== "200" || !resp200)
+          .map(([status, r]) => {
+            const s =
+              r?.content?.["application/json"]?.schema ||
+              r?.content?.["application/x-www-form-urlencoded"]?.schema ||
+              null;
+            return { status, description: r?.description || "", schemaRef: toSelector(s) };
+          });
+
+        importedBlocks.push({
+          method: m,
+          path,
+          operationId: op.operationId || `${m}_${Date.now()}`,
+          description: op.description || "",
+          tagsText: (op.tags || []).join(", "),
+          parameters: params,
+          requestSchemaRef: toSelector(reqSchema),
+          responseSchemaRef: toSelector(resp200),
+          responses: customResps,
+        });
+      });
+    });
+
+    setSchemas(importedSchemas);
+    setBlocks(importedBlocks);
+
+    try {
+      setYamlSpec(yaml.dump(spec));
+    } catch {
+      // if dump fails, the next sync will rebuild from state
+    }
+
+    try {
+      localStorage.setItem("swaggerBlocks", JSON.stringify(importedBlocks));
+      localStorage.setItem("swaggerSchemas", JSON.stringify(importedSchemas));
+      localStorage.setItem("swaggerYaml", yaml.dump(spec));
+    } catch {}
+    alert("Import successful ✅");
+  };
+  /* ------------------------------------- */
+
   // YAML SYNC
   useEffect(() => {
     try {
@@ -329,7 +468,7 @@ export default function Canvas() {
           responses: {},
         };
 
-        // ✅ Tags: endpoint-specific or fallback to default
+        // Tags: endpoint-specific or default
         const defaultTags = parseTags(defaultTagsText);
         const opTags = Array.isArray(block.tags) ? block.tags : parseTags(block.tagsText || "");
         if ((opTags && opTags.length) || defaultTags.length) {
@@ -403,103 +542,82 @@ export default function Canvas() {
       parsed.components = parsed.components || {};
       parsed.components.schemas = {};
 
-    schemas.forEach((schema) => {
-    if (!schema.name) return;
+      schemas.forEach((schema) => {
+        if (!schema.name) return;
 
-    const properties = {};
-    const required = [];
+        const properties = {};
+        const required = [];
 
-    (schema.fields || []).forEach((field) => {
-      if (!field?.name) return;
-      if (field.required ?? true) required.push(field.name);
-      const applyCommon = (obj) => {
-        if (field.description) obj.description = field.description;
-          return obj;
-      };
+        (schema.fields || []).forEach((field) => {
+          if (!field?.name) return;
+          if (field.required ?? true) required.push(field.name);
 
-      // enum
-      if (field.type === "enum") {
-        properties[field.name] = {
-          type: "string",
-          enum: (field.enum || []).filter((v) => v?.trim()),
+          const applyCommon = (obj) => {
+            if (field.description) obj.description = field.description;
+            return obj;
+          };
+
+          if (field.type === "enum") {
+            properties[field.name] = applyCommon({
+              type: "string",
+              enum: (field.enum || []).filter((v) => v?.trim()),
+            });
+
+          } else if (field.type === "array") {
+            if (field.itemsType === "$ref" && field.ref) {
+              properties[field.name] = applyCommon({
+                type: "array",
+                items: { $ref: `#/components/schemas/${field.ref}` },
+              });
+            } else if (field.itemsType === "double") {
+              properties[field.name] = applyCommon({
+                type: "array",
+                items: { type: "number", format: "double" },
+              });
+            } else {
+              properties[field.name] = applyCommon({
+                type: "array",
+                items: {
+                  type: field.itemsType || "string",
+                  ...(field.itemsFormat ? { format: field.itemsFormat } : {}),
+                },
+              });
+            }
+
+          } else if (field.type === "$ref" && field.ref) {
+            properties[field.name] = { $ref: `#/components/schemas/${field.ref}` };
+
+          } else if (field.type === "double") {
+            properties[field.name] = applyCommon({ type: "number", format: "double" });
+
+          } else if (field.type === "oneOf" || field.type === "anyOf") {
+            const keyword = field.type;
+            const variants = (field.variants || [])
+              .map((v) => {
+                if (v.kind === "$ref" && v.ref) return { $ref: `#/components/schemas/${v.ref}` };
+                if (v.type === "double") return { type: "number", format: "double" };
+                const obj = { type: v.type || "string" };
+                if (v.format) obj.format = v.format;
+                return obj;
+              })
+              .filter(Boolean);
+            if (variants.length > 0) properties[field.name] = applyCommon({ [keyword]: variants });
+
+          } else {
+            const base = { type: field.type };
+            if (field.format) base.format = field.format;
+            properties[field.name] = applyCommon(base);
+          }
+        });
+
+        parsed.components.schemas[schema.name] = {
+          type: "object",
+          properties,
+          required,
         };
-        if (field.description) properties[field.name].description = field.description;
-
-      // array
-      } else if (field.type === "array") {
-        if (field.itemsType === "$ref" && field.ref) {
-          properties[field.name] = {
-            type: "array",
-            items: { $ref: `#/components/schemas/${field.ref}` },
-          };
-        } else if (field.itemsType === "double") {
-          properties[field.name] = {
-            type: "array",
-            items: { type: "number", format: "double" },
-          };
-        } else {
-          properties[field.name] = {
-            type: "array",
-            items: {
-              type: field.itemsType || "string",
-              ...(field.itemsFormat ? { format: field.itemsFormat } : {}),
-            },
-          };
-        }
-        if (field.description) properties[field.name].description = field.description;
-
-      // direct $ref (no siblings allowed next to $ref in OAS3)
-      } else if (field.type === "$ref" && field.ref) {
-        properties[field.name] = { $ref: `#/components/schemas/${field.ref}` };
-
-        // If you want a description here, uncomment this pattern:
-        // properties[field.name] = {
-        //   allOf: [{ $ref: `#/components/schemas/${field.ref}` }],
-        //   ...(field.description ? { description: field.description } : {}),
-        // };
-
-      // explicit double
-      } else if (field.type === "double") {
-        properties[field.name] = { type: "number", format: "double" };
-        if (field.description) properties[field.name].description = field.description;
-
-      // primitive (string/integer/number/boolean)
-      } else if (field.type === "oneOf" || field.type === "anyOf") {
-           const keyword = field.type; // 'oneOf' or 'anyOf'
-           const variants = (field.variants || []).map((v) => {
-             if (v.kind === "$ref" && v.ref) {
-               return { $ref: `#/components/schemas/${v.ref}` };
-             }
-             // primitive
-             if (v.type === "double") {
-               return { type: "number", format: "double" };
-             }
-             const obj = { type: v.type || "string" };
-             if (v.format) obj.format = v.format;
-             return obj;
-           }).filter(Boolean);
-
-           if (variants.length > 0) {
-             properties[field.name] = applyCommon({ [keyword]: variants });
-           }
-      } else {
-        properties[field.name] = { type: field.type };
-        if (field.format) properties[field.name].format = field.format;
-        if (field.description) properties[field.name].description = field.description;
-      }
-  });
-
-  parsed.components = parsed.components || {};
-  parsed.components.schemas = parsed.components.schemas || {};
-  parsed.components.schemas[schema.name] = {
-    type: "object",
-    properties,
-    required,
-  };
       });
 
-
-      // ✅ Top-level tags array for Swagger UI groups
+      // Top-level tags array for Swagger UI groups
       const allTagNames = new Set();
       Object.values(parsed.paths || {}).forEach((pathItem) => {
         Object.values(pathItem || {}).forEach((op) => {
@@ -513,7 +631,7 @@ export default function Canvas() {
     } catch (e) {
       console.error("Failed to parse or update YAML", e);
     }
-  }, [blocks, schemas, defaultTagsText]); // ✅ watch defaultTagsText
+  }, [blocks, schemas, defaultTagsText]);
 
   return (
     <div className={styles.canvasContainer}>
@@ -536,9 +654,23 @@ export default function Canvas() {
 
         <div className={styles.specViewer}>
           <div className={styles.specHeader}>
-            <h3>Generated OpenAPI YAML</h3>
+            {/* <h3>Generated OpenAPI YAML</h3> */}
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button onClick={downloadYaml} className={styles.downloadBtn}>Download YAML</button>
+              {/* Default tags input */}
+              <input
+                className={styles.metaInput}
+                style={{ width: 220 }}
+                placeholder="Default tags (comma-separated)"
+                value={defaultTagsText}
+                onChange={(e) => setDefaultTagsText(e.target.value)}
+                title="Tags applied when an endpoint has none"
+              />
+              {/* Import */}
+              <label className={styles.addBtn} style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
+                Import
+                <input type="file" accept=".yaml,.yml,.json" onChange={onImportFile} style={{ display: "none" }} />
+              </label>
+              <button onClick={downloadYaml} className={styles.downloadBtn}>Download</button>
               <button onClick={clearWorkspace} className={styles.deleteEndpointBtn}>Clear</button>
             </div>
           </div>

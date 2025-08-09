@@ -113,6 +113,30 @@ export default function EndpointBuilder({
               </optgroup>
             </select>
 
+            {/* Response Body Schema */}
+            <select
+              className={styles.metaInput}
+              value={block.responseSchemaRef || ""}
+              onChange={(e) => updateBlock(idx, "responseSchemaRef", e.target.value)}
+              title="Default 200 response body schema"
+            >
+              <option value="">No Response Body</option>
+              <optgroup label="Primitive Types">
+                <option value="type:string">string</option>
+                <option value="type:integer">integer</option>
+                <option value="type:boolean">boolean</option>
+                <option value="type:number">number</option>
+                <option value="type:double">double</option>
+              </optgroup>
+              <optgroup label="Component Schemas">
+                {schemas.map((s) => (
+                  <option key={s.name} value={`ref:${s.name}`}>
+                    {s.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+
             {/* Parameters (collapsible) */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
