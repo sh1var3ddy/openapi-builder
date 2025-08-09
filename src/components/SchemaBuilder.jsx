@@ -37,7 +37,6 @@ export default function SchemaBuilder({
                   type="button"
                   className={styles.addBtn}
                   onClick={() => duplicateSchema?.(s.id)}
-                  title="Duplicate"
                 >
                   Duplicate
                 </button>
@@ -97,15 +96,18 @@ export default function SchemaBuilder({
                 <option value="$ref">Schema Reference</option>
               </select>
 
-              {/* Required toggle */}
-              <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={field.required ?? true}
-                  onChange={(e) => updateField(sIdx, fIdx, "required", e.target.checked)}
-                />
-                Required
-              </label>
+              {/* 🔹 Required / Optional selector (replaces checkbox) */}
+              <select
+                className={styles.metaInput}
+                value={field.required ?? true ? "required" : "optional"}
+                onChange={(e) =>
+                  updateField(sIdx, fIdx, "required", e.target.value === "required")
+                }
+                title="Controls whether this field appears in the schema's 'required' array"
+              >
+                <option value="required">Required</option>
+                <option value="optional">Optional</option>
+              </select>
 
               {/* Delete field */}
               <button
@@ -113,7 +115,6 @@ export default function SchemaBuilder({
                 className={styles.inlineDeleteBtn}
                 onClick={() => deleteField(sIdx, fIdx)}
                 title="Delete field"
-                aria-label={`Delete field ${field.name || ""}`}
               >
                 ✕
               </button>
@@ -127,7 +128,7 @@ export default function SchemaBuilder({
                 >
                   <option value="">-- Select Schema --</option>
                   {(schemas || [])
-                    .filter((s) => s.name !== schema.name) // avoid obvious self-ref loop
+                    .filter((s) => s.name !== schema.name)
                     .map((s) => (
                       <option key={s.name} value={s.name}>
                         {s.name}
@@ -196,7 +197,6 @@ export default function SchemaBuilder({
                     <option value="$ref">Schema Reference</option>
                   </select>
 
-                  {/* $ref for array items */}
                   {field.itemsType === "$ref" && (
                     <select
                       className={styles.metaInput}
