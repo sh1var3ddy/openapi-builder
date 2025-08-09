@@ -403,53 +403,79 @@ export default function Canvas() {
       parsed.components = parsed.components || {};
       parsed.components.schemas = {};
 
-      schemas.forEach((schema) => {
-        if (!schema.name) return;
+    schemas.forEach((schema) => {
+    if (!schema.name) return;
 
-        const properties = {};
-        const required = [];
+    const properties = {};
+    const required = [];
 
-        schema.fields.forEach((field) => {
-          if (!field.name) return;
-          if (field.required ?? true) required.push(field.name);
+    (schema.fields || []).forEach((field) => {
+      if (!field?.name) return;
+      if (field.required ?? true) required.push(field.name);
 
-          if (field.type === "enum") {
-            properties[field.name] = {
-              type: "string",
-              enum: field.enum?.filter((v) => v?.trim()) || [],
-            };
-          } else if (field.type === "array") {
-            if (field.itemsType === "$ref" && field.ref) {
-              properties[field.name] = {
-                type: "array",
-                items: { $ref: `#/components/schemas/${field.ref}` },
-              };
-            } else if (field.itemsType === "double") {
-              properties[field.name] = {
-                type: "array",
-                items: { type: "number", format: "double" },
-              };
-            } else {
-              properties[field.name] = {
-                type: "array",
-                items: { type: field.itemsType || "string" },
-              };
-            }
-          } else if (field.type === "$ref" && field.ref) {
-            properties[field.name] = { $ref: `#/components/schemas/${field.ref}` };
-          } else if (field.type === "double") {
-            properties[field.name] = { type: "number", format: "double" };
-          } else {
-            properties[field.name] = { type: field.type };
-          }
-        });
-
-        parsed.components.schemas[schema.name] = {
-          type: "object",
-          properties,
-          required,
+      // enum
+      if (field.type === "enum") {
+        properties[field.name] = {
+          type: "string",
+          enum: (field.enum || []).filter((v) => v?.trim()),
         };
+        if (field.description) properties[field.name].description = field.description;
+
+      // array
+      } else if (field.type === "array") {
+        if (field.itemsType === "$ref" && field.ref) {
+          properties[field.name] = {
+            type: "array",
+            items: { $ref: `#/components/schemas/${field.ref}` },
+          };
+        } else if (field.itemsType === "double") {
+          properties[field.name] = {
+            type: "array",
+            items: { type: "number", format: "double" },
+          };
+        } else {
+          properties[field.name] = {
+            type: "array",
+            items: {
+              type: field.itemsType || "string",
+              ...(field.itemsFormat ? { format: field.itemsFormat } : {}),
+            },
+          };
+        }
+        if (field.description) properties[field.name].description = field.description;
+
+      // direct $ref (no siblings allowed next to $ref in OAS3)
+      } else if (field.type === "$ref" && field.ref) {
+        properties[field.name] = { $ref: `#/components/schemas/${field.ref}` };
+
+        // If you want a description here, uncomment this pattern:
+        // properties[field.name] = {
+        //   allOf: [{ $ref: `#/components/schemas/${field.ref}` }],
+        //   ...(field.description ? { description: field.description } : {}),
+        // };
+
+      // explicit double
+      } else if (field.type === "double") {
+        properties[field.name] = { type: "number", format: "double" };
+        if (field.description) properties[field.name].description = field.description;
+
+      // primitive (string/integer/number/boolean)
+      } else {
+        properties[field.name] = { type: field.type };
+        if (field.format) properties[field.name].format = field.format;
+        if (field.description) properties[field.name].description = field.description;
+      }
+  });
+
+  parsed.components = parsed.components || {};
+  parsed.components.schemas = parsed.components.schemas || {};
+  parsed.components.schemas[schema.name] = {
+    type: "object",
+    properties,
+    required,
+  };
       });
+
 
       // ✅ Top-level tags array for Swagger UI groups
       const allTagNames = new Set();
@@ -489,14 +515,14 @@ export default function Canvas() {
           <h3>Generated OpenAPI YAML</h3>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {/* ✅ Default tags input */}
-            <input
+            {/* <input
               className={styles.metaInput}
               style={{ width: 220 }}
               placeholder="Default Tags (comma-separated)"
               value={defaultTagsText}
               onChange={(e) => setDefaultTagsText(e.target.value)}
               title="These tags apply to endpoints that don't define their own"
-            />
+            /> */}
             <button onClick={downloadYaml} className={styles.downloadBtn}>
               Download YAML
             </button>
