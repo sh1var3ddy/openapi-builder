@@ -412,6 +412,10 @@ export default function Canvas() {
     (schema.fields || []).forEach((field) => {
       if (!field?.name) return;
       if (field.required ?? true) required.push(field.name);
+      const applyCommon = (obj) => {
+        if (field.description) obj.description = field.description;
+          return obj;
+      };
 
       // enum
       if (field.type === "enum") {
@@ -460,6 +464,24 @@ export default function Canvas() {
         if (field.description) properties[field.name].description = field.description;
 
       // primitive (string/integer/number/boolean)
+      } else if (field.type === "oneOf" || field.type === "anyOf") {
+           const keyword = field.type; // 'oneOf' or 'anyOf'
+           const variants = (field.variants || []).map((v) => {
+             if (v.kind === "$ref" && v.ref) {
+               return { $ref: `#/components/schemas/${v.ref}` };
+             }
+             // primitive
+             if (v.type === "double") {
+               return { type: "number", format: "double" };
+             }
+             const obj = { type: v.type || "string" };
+             if (v.format) obj.format = v.format;
+             return obj;
+           }).filter(Boolean);
+
+           if (variants.length > 0) {
+             properties[field.name] = applyCommon({ [keyword]: variants });
+           }
       } else {
         properties[field.name] = { type: field.type };
         if (field.format) properties[field.name].format = field.format;

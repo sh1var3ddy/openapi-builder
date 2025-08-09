@@ -3,15 +3,15 @@ import styles from "./Canvas.module.css";
 
 const STRING_FORMATS = ["", "date-time", "date", "uuid", "email", "uri", "hostname", "ipv4", "ipv6", "byte", "binary", "password"];
 const INTEGER_FORMATS = ["", "int32", "int64"];
-const NUMBER_FORMATS  = ["", "float", "double"]; // note: you also have explicit "double" type elsewhere
-const BOOLEAN_FORMATS = [""]; // none, but keep consistent
+const NUMBER_FORMATS  = ["", "float", "double"];
+const BOOLEAN_FORMATS = [""];
 
 function formatOptionsFor(type) {
   switch (type) {
     case "string":  return STRING_FORMATS;
     case "integer": return INTEGER_FORMATS;
     case "number":  return NUMBER_FORMATS;
-    case "double":  return NUMBER_FORMATS; // allow user to pick "double" or keep empty; YAML builder already maps type:double → number+double
+    case "double":  return NUMBER_FORMATS;
     case "boolean": return BOOLEAN_FORMATS;
     default:        return [""];
   }
@@ -30,6 +30,23 @@ export default function SchemaBuilder({
   duplicateSchema,
   deleteSchemaById,
 }) {
+  const addVariant = (sIdx, fIdx) => {
+    const v = { kind: "primitive", type: "string", format: "" };
+    updateField(sIdx, fIdx, "variants", [ ...(editingSchemas[sIdx]?.fields?.[fIdx]?.variants || []), v ]);
+  };
+
+  const updateVariant = (sIdx, fIdx, vIdx, key, value) => {
+    const list = [...(editingSchemas[sIdx]?.fields?.[fIdx]?.variants || [])];
+    list[vIdx] = { ...list[vIdx], [key]: value };
+    updateField(sIdx, fIdx, "variants", list);
+  };
+
+  const deleteVariant = (sIdx, fIdx, vIdx) => {
+    const list = [...(editingSchemas[sIdx]?.fields?.[fIdx]?.variants || [])];
+    list.splice(vIdx, 1);
+    updateField(sIdx, fIdx, "variants", list);
+  };
+
   return (
     <div className={styles.schemaPanel}>
       <h3>Component Schemas</h3>
@@ -47,7 +64,7 @@ export default function SchemaBuilder({
                 <button
                   type="button"
                   className={styles.inlineDeleteBtn}
-                  onClick={() => { if (confirm(`Delete schema "${s.name}"?`)) deleteSchemaById?.(s.id); }}
+                  onClick={() => { if (confirm(`Delete schema "${s.name}"? This cannot be undone.`)) deleteSchemaById?.(s.id); }}
                 >
                   ✕
                 </button>
@@ -75,9 +92,11 @@ export default function SchemaBuilder({
             const isArrayPrimitive  = field.type === "array" && !["$ref"].includes(field.itemsType) && !!field.itemsType;
             const arrayFormatChoices = formatOptionsFor(field.itemsType);
 
+            const isComposition = field.type === "oneOf" || field.type === "anyOf";
+            const variants = field.variants || [];
+
             return (
               <div key={fIdx} className={styles.fieldRow}>
-
                 {/* Field name */}
                 <input
                   className={styles.metaInput}
@@ -100,6 +119,9 @@ export default function SchemaBuilder({
                   <option value="enum">enum</option>
                   <option value="array">array</option>
                   <option value="$ref">Schema Reference</option>
+                  {/* NEW */}
+                  <option value="oneOf">oneOf (union)</option>
+                  <option value="anyOf">anyOf</option>
                 </select>
 
                 {/* Required / Optional */}
@@ -123,16 +145,15 @@ export default function SchemaBuilder({
                   ✕
                 </button>
 
-                {/* —— Optional Description —— */}
+                {/* Description (optional) */}
                 <input
                   className={styles.metaInput}
                   value={field.description || ""}
                   onChange={(e) => updateField(sIdx, fIdx, "description", e.target.value)}
                   placeholder="Description (optional)"
-                  title="Description appears in the schema under this property"
                 />
 
-                {/* —— Optional Format (for primitives) —— */}
+                {/* Format (optional for primitives) */}
                 {showFormatOnField && (
                   <select
                     className={styles.metaInput}
@@ -146,7 +167,7 @@ export default function SchemaBuilder({
                   </select>
                 )}
 
-                {/* Direct $ref */}
+                {/* $ref property */}
                 {field.type === "$ref" && (
                   <select
                     className={styles.metaInput}
@@ -224,7 +245,6 @@ export default function SchemaBuilder({
                       <option value="$ref">Schema Reference</option>
                     </select>
 
-                    {/* $ref for array items */}
                     {field.itemsType === "$ref" && (
                       <select
                         className={styles.metaInput}
@@ -255,6 +275,87 @@ export default function SchemaBuilder({
                         ))}
                       </select>
                     )}
+                  </div>
+                )}
+
+                {/* oneOf / anyOf editor */}
+                {isComposition && (
+                  <div className={styles.schemaBlock} style={{ width: "100%" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <strong>{field.type} variants</strong>
+                      <button type="button" className={styles.addBtn} onClick={() => addVariant(sIdx, fIdx)}>
+                        + Add Variant
+                      </button>
+                    </div>
+
+                    {variants.length === 0 && (
+                      <div className={styles.emptyMessage}>No variants yet. Add a primitive type or a schema reference.</div>
+                    )}
+
+                    {variants.map((v, vIdx) => {
+                      const primitiveFormats = formatOptionsFor(v.type);
+                      return (
+                        <div key={vIdx} className={styles.fieldRow}>
+                          <select
+                            className={styles.metaInput}
+                            value={v.kind || "primitive"}
+                            onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "kind", e.target.value)}
+                            title="Variant kind"
+                          >
+                            <option value="primitive">Primitive</option>
+                            <option value="$ref">Schema Reference</option>
+                          </select>
+
+                          {v.kind !== "$ref" ? (
+                            <>
+                              <select
+                                className={styles.metaInput}
+                                value={v.type || "string"}
+                                onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "type", e.target.value)}
+                              >
+                                <option value="string">string</option>
+                                <option value="integer">integer</option>
+                                <option value="boolean">boolean</option>
+                                <option value="number">number</option>
+                                <option value="double">double</option>
+                              </select>
+
+                              <select
+                                className={styles.metaInput}
+                                value={v.format || ""}
+                                onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "format", e.target.value)}
+                              >
+                                {primitiveFormats.map((opt) => (
+                                  <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
+                                ))}
+                              </select>
+                            </>
+                          ) : (
+                            <select
+                              className={styles.metaInput}
+                              value={v.ref || ""}
+                              onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "ref", e.target.value)}
+                            >
+                              <option value="">-- Select Schema --</option>
+                              {(schemas || [])
+                                .filter((s) => s.name !== schema.name)
+                                .map((s) => (
+                                  <option key={s.name} value={s.name}>{s.name}</option>
+                                ))}
+                            </select>
+                          )}
+
+                          <button
+                            type="button"
+                            className={styles.inlineDeleteBtn}
+                            onClick={() => deleteVariant(sIdx, fIdx, vIdx)}
+                            title="Remove variant"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
