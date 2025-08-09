@@ -225,16 +225,41 @@ export default function Canvas() {
     ]);
   };
 
-  const duplicateSchema = (id) => {
-    const s = schemas.find((sc) => sc.id === id);
-    if (!s) return;
-    const copy = {
-      id: uid(),
-      name: `${s.name}_copy`,
-      fields: JSON.parse(JSON.stringify(s.fields || [])),
-    };
-    setSchemas((prev) => [...prev, copy]);
+  const ensureUniqueSchemaName = (base, existingNames) => {
+    if (!existingNames.includes(base)) return base;
+    // try _copy, _copy2, _copy3...
+    let i = 1;
+    let candidate = `${base}_copy`;
+    while (existingNames.includes(candidate)) {
+      i += 1;
+      candidate = `${base}_copy${i}`;
+    }
+    return candidate;
   };
+
+  const duplicateSchema = (id, { edit = false } = {}) => {
+    setSchemas((prev) => {
+      const src = prev.find((sc) => sc.id === id);
+      if (!src) return prev;
+
+      const existingNames = prev.map((p) => p.name);
+      const newName = ensureUniqueSchemaName(src.name, existingNames);
+
+      const copy = {
+        id: uid(),
+        name: newName,
+        fields: JSON.parse(JSON.stringify(src.fields || [])),
+      };
+      const next = [...prev, copy];
+
+      // optionally open it for editing right away
+      if (edit) {
+        // defer to next tick so setState is applied
+        setTimeout(() => startEditSchema(copy.id), 0);
+      }
+      return next;
+    });
+  }
 
   const deleteSchemaById = (id) => {
     setSchemas((prev) => prev.filter((sc) => sc.id !== id));

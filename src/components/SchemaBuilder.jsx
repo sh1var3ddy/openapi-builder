@@ -37,14 +37,13 @@ export default function SchemaBuilder({
                   type="button"
                   className={styles.addBtn}
                   onClick={() => duplicateSchema?.(s.id)}
+                  title="Duplicate"
                 >
                   Duplicate
                 </button>
                 <button
                   type="button"
                   className={styles.inlineDeleteBtn}
-                  aria-label={`Delete schema ${s.name}`}
-                  title="Delete schema"
                   onClick={() => {
                     if (confirm(`Delete schema "${s.name}"? This cannot be undone.`)) {
                       deleteSchemaById?.(s.id);
