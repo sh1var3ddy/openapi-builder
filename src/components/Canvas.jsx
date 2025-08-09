@@ -86,7 +86,9 @@ export default function Canvas() {
   const [schemas, setSchemas] = useState([]);
   const [editingSchemas, setEditingSchemas] = useState([]);
   const [defaultTagsText, setDefaultTagsText] = useState("");
-
+  const discardDraft = (index) => {
+   setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
+ };
   const parseTags = (txt) =>
     String(txt || "")
       .split(",")
@@ -908,6 +910,7 @@ export default function Canvas() {
           startEditSchema={startEditSchema}
           duplicateSchema={duplicateSchema}
           deleteSchemaById={deleteSchemaById}
+          cancelDraft={discardDraft}
         />
       </div>
     </div>

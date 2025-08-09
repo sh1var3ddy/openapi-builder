@@ -29,8 +29,9 @@ export default function SchemaBuilder({
   startEditSchema,
   duplicateSchema,
   deleteSchemaById,
+  cancelDraft, // 👈 NEW
 }) {
-  // field-level composition controls (unchanged)
+  // field-level composition controls
   const addVariant = (sIdx, fIdx) => {
     const v = { kind: "primitive", type: "string", format: "" };
     updateField(sIdx, fIdx, "variants", [ ...(editingSchemas[sIdx]?.fields?.[fIdx]?.variants || []), v ]);
@@ -46,7 +47,7 @@ export default function SchemaBuilder({
     updateField(sIdx, fIdx, "variants", list);
   };
 
-  // NEW: schema-level composition controls
+  // schema-level composition controls
   const addSchemaVariant = (sIdx) => {
     const v = { kind: "primitive", type: "string", format: "" };
     const current = editingSchemas[sIdx]?.variants || [];
@@ -95,6 +96,7 @@ export default function SchemaBuilder({
         const schemaType = schema.schemaType || "object";
         return (
           <div key={sIdx} className={styles.schemaBlock}>
+            {/* Header row: name, type, format, actions */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <input
                 className={styles.metaInput}
@@ -120,7 +122,6 @@ export default function SchemaBuilder({
                 <option value="double">double</option>
                 <option value="array">array</option>
                 <option value="$ref">Schema Reference</option>
-                {/* NEW */}
                 <option value="oneOf">oneOf (union)</option>
                 <option value="anyOf">anyOf</option>
               </select>
@@ -138,6 +139,46 @@ export default function SchemaBuilder({
                   ))}
                 </select>
               )}
+
+              {/* Actions on the right */}
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                {!schema.__editId ? (
+                  // Draft: Discard
+                  <button
+                    type="button"
+                    className={styles.deleteEndpointBtn}
+                    onClick={() => cancelDraft?.(sIdx)}
+                    title="Discard this draft"
+                  >
+                    Discard
+                  </button>
+                ) : (
+                  // Editing: Delete Schema + Discard changes
+                  <>
+                    <button
+                      type="button"
+                      className={styles.deleteEndpointBtn}
+                      onClick={() => {
+                        if (confirm(`Delete schema "${schema.name}"? This cannot be undone.`)) {
+                          deleteSchemaById?.(schema.__editId);
+                          cancelDraft?.(sIdx);
+                        }
+                      }}
+                      title="Delete this schema"
+                    >
+                      Delete Schema
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.inlineDeleteBtn}
+                      onClick={() => cancelDraft?.(sIdx)}
+                      title="Discard changes"
+                    >
+                      Discard
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* ENUM schema editor */}
@@ -248,7 +289,7 @@ export default function SchemaBuilder({
               </div>
             )}
 
-            {/* NEW: schema-level oneOf / anyOf editor */}
+            {/* schema-level oneOf / anyOf editor */}
             {(schemaType === "oneOf" || schemaType === "anyOf") && (
               <div className={styles.schemaBlock} style={{ width: "100%" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -329,7 +370,7 @@ export default function SchemaBuilder({
               </div>
             )}
 
-            {/* OBJECT schema fields editor (with field-level oneOf/anyOf preserved) */}
+            {/* OBJECT schema fields editor */}
             {schemaType === "object" && (
               <>
                 {(schema.fields ?? []).map((field, fIdx) => {
@@ -617,6 +658,8 @@ export default function SchemaBuilder({
                 </button>
               </>
             )}
+
+            {/* Non-object hint */}
             {schemaType !== "object" && (
               <div className={styles.emptyMessage} style={{ marginTop: 8 }}>
                 Switch schema type to <strong>object</strong> to add fields.
