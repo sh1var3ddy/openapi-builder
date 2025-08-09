@@ -75,307 +75,456 @@ export default function SchemaBuilder({
       )}
 
       {/* Draft editors */}
-      {(editingSchemas || []).map((schema, sIdx) => (
-        <div key={sIdx} className={styles.schemaBlock}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              className={styles.metaInput}
-              value={schema.name}
-              onChange={(e) => updateSchemaName(sIdx, e.target.value)}
-              placeholder="Schema Name"
-            />
-            {schema.__editId && <span className={styles.editBadge}>Editing</span>}
-          </div>
+      {(editingSchemas || []).map((schema, sIdx) => {
+        const schemaType = schema.schemaType || "object";
+        return (
+          <div key={sIdx} className={styles.schemaBlock}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <input
+                className={styles.metaInput}
+                value={schema.name}
+                onChange={(e) => updateSchemaName(sIdx, e.target.value)}
+                placeholder="Schema Name"
+              />
+              {schema.__editId && <span className={styles.editBadge}>Editing</span>}
 
-          {(schema.fields ?? []).map((field, fIdx) => {
-            const showFormatOnField = ["string", "integer", "number", "double", "boolean"].includes(field.type);
-            const isArrayPrimitive  = field.type === "array" && !["$ref"].includes(field.itemsType) && !!field.itemsType;
-            const arrayFormatChoices = formatOptionsFor(field.itemsType);
+              {/* NEW: schema-level type */}
+              <select
+                className={styles.metaInput}
+                value={schemaType}
+                onChange={(e) => updateField(sIdx, -1, "schemaType", e.target.value)}
+                title="Schema type"
+              >
+                <option value="object">object</option>
+                <option value="enum">enum</option>
+                <option value="string">string</option>
+                <option value="integer">integer</option>
+                <option value="boolean">boolean</option>
+                <option value="number">number</option>
+                <option value="double">double</option>
+                <option value="array">array</option>
+                <option value="$ref">Schema Reference</option>
+              </select>
 
-            const isComposition = field.type === "oneOf" || field.type === "anyOf";
-            const variants = field.variants || [];
-
-            return (
-              <div key={fIdx} className={styles.fieldRow}>
-                {/* Field name */}
-                <input
-                  className={styles.metaInput}
-                  value={field.name}
-                  onChange={(e) => updateField(sIdx, fIdx, "name", e.target.value)}
-                  placeholder="Field Name"
-                />
-
-                {/* Field type */}
+              {/* Optional schema-level format for primitives/double */}
+              {["string","integer","number","double","boolean"].includes(schemaType) && (
                 <select
                   className={styles.metaInput}
-                  value={field.type}
-                  onChange={(e) => updateField(sIdx, fIdx, "type", e.target.value)}
+                  value={schema.format || ""}
+                  onChange={(e) => updateField(sIdx, -1, "format", e.target.value)}
+                  title="Schema format"
+                >
+                  {formatOptionsFor(schemaType === "double" ? "double" : schemaType).map((opt) => (
+                    <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* ENUM schema editor */}
+            {schemaType === "enum" && (
+              <div className={styles.enumEditor} style={{ width: "100%" }}>
+                <div className={styles.enumHeader}>
+                  <span>Schema enum values</span>
+                  <button
+                    type="button"
+                    className={styles.addBtn}
+                    onClick={() => updateField(sIdx, -1, "enum", [...(schema.enum || []), ""])}
+                  >
+                    + Add Value
+                  </button>
+                </div>
+
+                <div className={styles.enumList}>
+                  {(schema.enum || []).map((val, eIdx) => (
+                    <div key={eIdx} className={styles.enumItem}>
+                      <input
+                        className={styles.metaInput}
+                        value={val}
+                        onChange={(e) => {
+                          const next = [...(schema.enum || [])];
+                          next[eIdx] = e.target.value;
+                          updateField(sIdx, -1, "enum", next);
+                        }}
+                        placeholder={`Value ${eIdx + 1}`}
+                      />
+                      <button
+                        type="button"
+                        className={styles.deleteBtn}
+                        onClick={() => {
+                          const next = [...(schema.enum || [])];
+                          next.splice(eIdx, 1);
+                          updateField(sIdx, -1, "enum", next);
+                        }}
+                        title="Remove value"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ARRAY schema editor */}
+            {schemaType === "array" && (
+              <div className={styles.arrayConfig} style={{ width: "100%" }}>
+                <label>Array of:</label>
+                <select
+                  className={styles.metaInput}
+                  value={schema.itemsType || "string"}
+                  onChange={(e) => updateField(sIdx, -1, "itemsType", e.target.value)}
                 >
                   <option value="string">string</option>
                   <option value="integer">integer</option>
                   <option value="boolean">boolean</option>
                   <option value="number">number</option>
                   <option value="double">double</option>
-                  <option value="enum">enum</option>
-                  <option value="array">array</option>
                   <option value="$ref">Schema Reference</option>
-                  {/* NEW */}
-                  <option value="oneOf">oneOf (union)</option>
-                  <option value="anyOf">anyOf</option>
                 </select>
 
-                {/* Required / Optional */}
-                <select
-                  className={styles.metaInput}
-                  value={field.required ?? true ? "required" : "optional"}
-                  onChange={(e) => updateField(sIdx, fIdx, "required", e.target.value === "required")}
-                  title="Controls whether this field appears in the schema's 'required' array"
-                >
-                  <option value="required">Required</option>
-                  <option value="optional">Optional</option>
-                </select>
-
-                {/* Delete field */}
-                <button
-                  type="button"
-                  className={styles.inlineDeleteBtn}
-                  onClick={() => deleteField(sIdx, fIdx)}
-                  title="Delete field"
-                >
-                  ✕
-                </button>
-
-                {/* Description (optional) */}
-                <input
-                  className={styles.metaInput}
-                  value={field.description || ""}
-                  onChange={(e) => updateField(sIdx, fIdx, "description", e.target.value)}
-                  placeholder="Description (optional)"
-                />
-
-                {/* Format (optional for primitives) */}
-                {showFormatOnField && (
+                {schema.itemsType === "$ref" ? (
                   <select
                     className={styles.metaInput}
-                    value={field.format || ""}
-                    onChange={(e) => updateField(sIdx, fIdx, "format", e.target.value)}
-                    title="Optional format for this type"
-                  >
-                    {formatOptionsFor(field.type).map((opt) => (
-                      <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
-                    ))}
-                  </select>
-                )}
-
-                {/* $ref property */}
-                {field.type === "$ref" && (
-                  <select
-                    className={styles.metaInput}
-                    value={field.ref || ""}
-                    onChange={(e) => updateField(sIdx, fIdx, "ref", e.target.value)}
+                    value={schema.ref || ""}
+                    onChange={(e) => updateField(sIdx, -1, "ref", e.target.value)}
                   >
                     <option value="">-- Select Schema --</option>
                     {(schemas || [])
                       .filter((s) => s.name !== schema.name)
                       .map((s) => (
-                        <option key={s.name} value={s.name}>
-                          {s.name}
-                        </option>
+                        <option key={s.name} value={s.name}>{s.name}</option>
                       ))}
                   </select>
-                )}
-
-                {/* Enum editor */}
-                {field.type === "enum" && (
-                  <div className={styles.enumEditor}>
-                    <div className={styles.enumHeader}>
-                      <span>Enum values</span>
-                      <button
-                        type="button"
-                        className={styles.addBtn}
-                        onClick={() =>
-                          updateField(sIdx, fIdx, "enum", [...(field.enum || []), ""])
-                        }
-                      >
-                        + Add Value
-                      </button>
-                    </div>
-
-                    <div className={styles.enumList}>
-                      {(field.enum || []).map((val, eIdx) => (
-                        <div key={eIdx} className={styles.enumItem}>
-                          <input
-                            className={styles.metaInput}
-                            value={val}
-                            onChange={(e) =>
-                              updateField(sIdx, fIdx, "enum", [
-                                ...field.enum.slice(0, eIdx),
-                                e.target.value,
-                                ...field.enum.slice(eIdx + 1),
-                              ])
-                            }
-                            placeholder={`Value ${eIdx + 1}`}
-                          />
-                          <button
-                            type="button"
-                            className={styles.deleteBtn}
-                            onClick={() => {
-                              const updated = [...field.enum];
-                              updated.splice(eIdx, 1);
-                              updateField(sIdx, fIdx, "enum", updated);
-                            }}
-                            title="Remove value"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Array editor */}
-                {field.type === "array" && (
-                  <div className={styles.arrayConfig}>
-                    <label>Array of:</label>
+                ) : (
+                  ["string","integer","number","double","boolean"].includes(schema.itemsType || "") && (
                     <select
                       className={styles.metaInput}
-                      value={field.itemsType || "string"}
-                      onChange={(e) => updateField(sIdx, fIdx, "itemsType", e.target.value)}
+                      value={schema.itemsFormat || ""}
+                      onChange={(e) => updateField(sIdx, -1, "itemsFormat", e.target.value)}
+                      title="Items format"
                     >
-                      <option value="string">string</option>
-                      <option value="integer">integer</option>
-                      <option value="boolean">boolean</option>
-                      <option value="number">number</option>
-                      <option value="double">double</option>
-                      <option value="$ref">Schema Reference</option>
+                      {formatOptionsFor(schema.itemsType === "double" ? "double" : (schema.itemsType || "string"))
+                        .map((opt) => <option key={opt || "none"} value={opt}>{opt || "— items format —"}</option>)}
                     </select>
-
-                    {field.itemsType === "$ref" && (
-                      <select
-                        className={styles.metaInput}
-                        value={field.ref || ""}
-                        onChange={(e) => updateField(sIdx, fIdx, "ref", e.target.value)}
-                      >
-                        <option value="">-- Select Schema --</option>
-                        {(schemas || [])
-                          .filter((s) => s.name !== schema.name)
-                          .map((s) => (
-                            <option key={s.name} value={s.name}>
-                              {s.name}
-                            </option>
-                          ))}
-                      </select>
-                    )}
-
-                    {/* Optional format for primitive array items */}
-                    {isArrayPrimitive && (
-                      <select
-                        className={styles.metaInput}
-                        value={field.itemsFormat || ""}
-                        onChange={(e) => updateField(sIdx, fIdx, "itemsFormat", e.target.value)}
-                        title="Optional format for array items"
-                      >
-                        {arrayFormatChoices.map((opt) => (
-                          <option key={opt || "none"} value={opt}>{opt || "— items format —"}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                  )
                 )}
+              </div>
+            )}
 
-                {/* oneOf / anyOf editor */}
-                {isComposition && (
-                  <div className={styles.schemaBlock} style={{ width: "100%" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <strong>{field.type} variants</strong>
-                      <button type="button" className={styles.addBtn} onClick={() => addVariant(sIdx, fIdx)}>
-                        + Add Variant
+            {/* $REF schema editor */}
+            {schemaType === "$ref" && (
+              <div className={styles.arrayConfig} style={{ width: "100%" }}>
+                <label>Reference schema:</label>
+                <select
+                  className={styles.metaInput}
+                  value={schema.ref || ""}
+                  onChange={(e) => updateField(sIdx, -1, "ref", e.target.value)}
+                >
+                  <option value="">-- Select Schema --</option>
+                  {(schemas || [])
+                    .filter((s) => s.name !== schema.name)
+                    .map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* OBJECT schema fields editor (existing UI) */}
+            {schemaType === "object" && (
+              <>
+                {(schema.fields ?? []).map((field, fIdx) => {
+                  const showFormatOnField = ["string", "integer", "number", "double", "boolean"].includes(field.type);
+                  const isArrayPrimitive  = field.type === "array" && !["$ref"].includes(field.itemsType) && !!field.itemsType;
+                  const arrayFormatChoices = formatOptionsFor(field.itemsType);
+
+                  const isComposition = field.type === "oneOf" || field.type === "anyOf";
+                  const variants = field.variants || [];
+
+                  return (
+                    <div key={fIdx} className={styles.fieldRow}>
+                      {/* Field name */}
+                      <input
+                        className={styles.metaInput}
+                        value={field.name}
+                        onChange={(e) => updateField(sIdx, fIdx, "name", e.target.value)}
+                        placeholder="Field Name"
+                      />
+
+                      {/* Field type */}
+                      <select
+                        className={styles.metaInput}
+                        value={field.type}
+                        onChange={(e) => updateField(sIdx, fIdx, "type", e.target.value)}
+                      >
+                        <option value="string">string</option>
+                        <option value="integer">integer</option>
+                        <option value="boolean">boolean</option>
+                        <option value="number">number</option>
+                        <option value="double">double</option>
+                        <option value="enum">enum</option>
+                        <option value="array">array</option>
+                        <option value="$ref">Schema Reference</option>
+                        {/* NEW */}
+                        <option value="oneOf">oneOf (union)</option>
+                        <option value="anyOf">anyOf</option>
+                      </select>
+
+                      {/* Required / Optional */}
+                      <select
+                        className={styles.metaInput}
+                        value={field.required ?? true ? "required" : "optional"}
+                        onChange={(e) => updateField(sIdx, fIdx, "required", e.target.value === "required")}
+                        title="Controls whether this field appears in the schema's 'required' array"
+                      >
+                        <option value="required">Required</option>
+                        <option value="optional">Optional</option>
+                      </select>
+
+                      {/* Delete field */}
+                      <button
+                        type="button"
+                        className={styles.inlineDeleteBtn}
+                        onClick={() => deleteField(sIdx, fIdx)}
+                        title="Delete field"
+                      >
+                        ✕
                       </button>
-                    </div>
 
-                    {variants.length === 0 && (
-                      <div className={styles.emptyMessage}>No variants yet. Add a primitive type or a schema reference.</div>
-                    )}
+                      {/* Description (optional) */}
+                      <input
+                        className={styles.metaInput}
+                        value={field.description || ""}
+                        onChange={(e) => updateField(sIdx, fIdx, "description", e.target.value)}
+                        placeholder="Description (optional)"
+                      />
 
-                    {variants.map((v, vIdx) => {
-                      const primitiveFormats = formatOptionsFor(v.type);
-                      return (
-                        <div key={vIdx} className={styles.fieldRow}>
+                      {/* Format (optional for primitives) */}
+                      {showFormatOnField && (
+                        <select
+                          className={styles.metaInput}
+                          value={field.format || ""}
+                          onChange={(e) => updateField(sIdx, fIdx, "format", e.target.value)}
+                          title="Optional format for this type"
+                        >
+                          {formatOptionsFor(field.type).map((opt) => (
+                            <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* $ref property */}
+                      {field.type === "$ref" && (
+                        <select
+                          className={styles.metaInput}
+                          value={field.ref || ""}
+                          onChange={(e) => updateField(sIdx, fIdx, "ref", e.target.value)}
+                        >
+                          <option value="">-- Select Schema --</option>
+                          {(schemas || [])
+                            .filter((s) => s.name !== schema.name)
+                            .map((s) => (
+                              <option key={s.name} value={s.name}>
+                                {s.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+
+                      {/* Enum editor (field-level) */}
+                      {field.type === "enum" && (
+                        <div className={styles.enumEditor}>
+                          <div className={styles.enumHeader}>
+                            <span>Enum values</span>
+                            <button
+                              type="button"
+                              className={styles.addBtn}
+                              onClick={() =>
+                                updateField(sIdx, fIdx, "enum", [...(field.enum || []), ""])
+                              }
+                            >
+                              + Add Value
+                            </button>
+                          </div>
+
+                          <div className={styles.enumList}>
+                            {(field.enum || []).map((val, eIdx) => (
+                              <div key={eIdx} className={styles.enumItem}>
+                                <input
+                                  className={styles.metaInput}
+                                  value={val}
+                                  onChange={(e) =>
+                                    updateField(sIdx, fIdx, "enum", [
+                                      ...field.enum.slice(0, eIdx),
+                                      e.target.value,
+                                      ...field.enum.slice(eIdx + 1),
+                                    ])
+                                  }
+                                  placeholder={`Value ${eIdx + 1}`}
+                                />
+                                <button
+                                  type="button"
+                                  className={styles.deleteBtn}
+                                  onClick={() => {
+                                    const updated = [...field.enum];
+                                    updated.splice(eIdx, 1);
+                                    updateField(sIdx, fIdx, "enum", updated);
+                                  }}
+                                  title="Remove value"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Array editor (field-level) */}
+                      {field.type === "array" && (
+                        <div className={styles.arrayConfig}>
+                          <label>Array of:</label>
                           <select
                             className={styles.metaInput}
-                            value={v.kind || "primitive"}
-                            onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "kind", e.target.value)}
-                            title="Variant kind"
+                            value={field.itemsType || "string"}
+                            onChange={(e) => updateField(sIdx, fIdx, "itemsType", e.target.value)}
                           >
-                            <option value="primitive">Primitive</option>
+                            <option value="string">string</option>
+                            <option value="integer">integer</option>
+                            <option value="boolean">boolean</option>
+                            <option value="number">number</option>
+                            <option value="double">double</option>
                             <option value="$ref">Schema Reference</option>
                           </select>
 
-                          {v.kind !== "$ref" ? (
-                            <>
-                              <select
-                                className={styles.metaInput}
-                                value={v.type || "string"}
-                                onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "type", e.target.value)}
-                              >
-                                <option value="string">string</option>
-                                <option value="integer">integer</option>
-                                <option value="boolean">boolean</option>
-                                <option value="number">number</option>
-                                <option value="double">double</option>
-                              </select>
-
-                              <select
-                                className={styles.metaInput}
-                                value={v.format || ""}
-                                onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "format", e.target.value)}
-                              >
-                                {primitiveFormats.map((opt) => (
-                                  <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
-                                ))}
-                              </select>
-                            </>
-                          ) : (
+                          {field.itemsType === "$ref" && (
                             <select
                               className={styles.metaInput}
-                              value={v.ref || ""}
-                              onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "ref", e.target.value)}
+                              value={field.ref || ""}
+                              onChange={(e) => updateField(sIdx, fIdx, "ref", e.target.value)}
                             >
                               <option value="">-- Select Schema --</option>
                               {(schemas || [])
                                 .filter((s) => s.name !== schema.name)
                                 .map((s) => (
-                                  <option key={s.name} value={s.name}>{s.name}</option>
+                                  <option key={s.name} value={s.name}>
+                                    {s.name}
+                                  </option>
                                 ))}
                             </select>
                           )}
 
-                          <button
-                            type="button"
-                            className={styles.inlineDeleteBtn}
-                            onClick={() => deleteVariant(sIdx, fIdx, vIdx)}
-                            title="Remove variant"
-                          >
-                            ✕
-                          </button>
+                          {/* Optional format for primitive array items */}
+                          {isArrayPrimitive && (
+                            <select
+                              className={styles.metaInput}
+                              value={field.itemsFormat || ""}
+                              onChange={(e) => updateField(sIdx, fIdx, "itemsFormat", e.target.value)}
+                              title="Optional format for array items"
+                            >
+                              {arrayFormatChoices.map((opt) => (
+                                <option key={opt || "none"} value={opt}>{opt || "— items format —"}</option>
+                              ))}
+                            </select>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      )}
 
-          <button type="button" onClick={() => addField(sIdx)} className={styles.addBtn}>
-            + Add Field
-          </button>
-          <button type="button" onClick={() => submitSchema(sIdx)} className={styles.saveBtn}>
-            {schema.__editId ? "💾 Update Schema" : "✅ Save Schema"}
-          </button>
-        </div>
-      ))}
+                      {/* oneOf / anyOf editor */}
+                      {isComposition && (
+                        <div className={styles.schemaBlock} style={{ width: "100%" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <strong>{field.type} variants</strong>
+                            <button type="button" className={styles.addBtn} onClick={() => addVariant(sIdx, fIdx)}>
+                              + Add Variant
+                            </button>
+                          </div>
+
+                          {variants.length === 0 && (
+                            <div className={styles.emptyMessage}>No variants yet. Add a primitive type or a schema reference.</div>
+                          )}
+
+                          {variants.map((v, vIdx) => {
+                            const primitiveFormats = formatOptionsFor(v.type);
+                            return (
+                              <div key={vIdx} className={styles.fieldRow}>
+                                <select
+                                  className={styles.metaInput}
+                                  value={v.kind || "primitive"}
+                                  onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "kind", e.target.value)}
+                                  title="Variant kind"
+                                >
+                                  <option value="primitive">Primitive</option>
+                                  <option value="$ref">Schema Reference</option>
+                                </select>
+
+                                {v.kind !== "$ref" ? (
+                                  <>
+                                    <select
+                                      className={styles.metaInput}
+                                      value={v.type || "string"}
+                                      onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "type", e.target.value)}
+                                    >
+                                      <option value="string">string</option>
+                                      <option value="integer">integer</option>
+                                      <option value="boolean">boolean</option>
+                                      <option value="number">number</option>
+                                      <option value="double">double</option>
+                                    </select>
+
+                                    <select
+                                      className={styles.metaInput}
+                                      value={v.format || ""}
+                                      onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "format", e.target.value)}
+                                    >
+                                      {primitiveFormats.map((opt) => (
+                                        <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
+                                      ))}
+                                    </select>
+                                  </>
+                                ) : (
+                                  <select
+                                    className={styles.metaInput}
+                                    value={v.ref || ""}
+                                    onChange={(e) => updateVariant(sIdx, fIdx, vIdx, "ref", e.target.value)}
+                                  >
+                                    <option value="">-- Select Schema --</option>
+                                    {(schemas || [])
+                                      .filter((s) => s.name !== schema.name)
+                                      .map((s) => (
+                                        <option key={s.name} value={s.name}>{s.name}</option>
+                                      ))}
+                                  </select>
+                                )}
+
+                                <button
+                                  type="button"
+                                  className={styles.inlineDeleteBtn}
+                                  onClick={() => deleteVariant(sIdx, fIdx, vIdx)}
+                                  title="Remove variant"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <button type="button" onClick={() => addField(sIdx)} className={styles.addBtn}>
+                  + Add Field
+                </button>
+              </>
+            )}
+
+            <button type="button" onClick={() => submitSchema(sIdx)} className={styles.saveBtn}>
+              {schema.__editId ? "💾 Update Schema" : "✅ Save Schema"}
+            </button>
+          </div>
+        );
+      })}
 
       <button type="button" onClick={startNewSchema} className={styles.addBtn}>
         + New Schema

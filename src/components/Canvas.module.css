@@ -59,6 +59,11 @@
   position: relative;
 }
 
+.enumEditor, .enumList {
+  width: 100%;
+}
+
+
 .pathInput,
 .metaInput {
   width: 100%;
@@ -67,6 +72,10 @@
   border: 1px solid #94a3b8;
   border-radius: 4px;
   font-size: 14px;
+}
+.metaInput {
+  min-width: 180px;
+  flex: 1 1 220px;
 }
 
 .method {
