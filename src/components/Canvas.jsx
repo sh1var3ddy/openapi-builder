@@ -15,6 +15,37 @@ export default function Canvas() {
   const [schemas, setSchemas] = useState([]);
   const [editingSchemas, setEditingSchemas] = useState([]);
 
+  const clearWorkspace = () => {
+  if (!confirm("Clear all endpoints, schemas, and YAML? This can’t be undone.")) return;
+  setBlocks([]);
+  setSchemas([]);
+  setEditingSchemas([]);
+  setYamlSpec(yaml.dump({
+    openapi: "3.0.0",
+    info: { title: "Swagger Builder API", version: "1.0.0", description: "Generated using drag-and-drop builder" },
+    servers: [{ url: "http://localhost:8080/api", description: "Development server" }],
+    paths: {},
+  }));
+  // also nuke localStorage
+  localStorage.removeItem("swaggerBlocks");
+  localStorage.removeItem("swaggerSchemas");
+  localStorage.removeItem("swaggerYaml");
+  };
+
+  const duplicateBlock = (index) => {
+    setBlocks((prev) => {
+      const src = prev[index];
+      if (!src) return prev;
+      const clone = {
+        ...JSON.parse(JSON.stringify(src)),
+        operationId: `${src.method}_${Date.now()}`, // new opId
+      };
+      const next = [...prev];
+      next.splice(index + 1, 0, clone);
+      return next;
+    });
+  };
+
   const [yamlSpec, setYamlSpec] = useState(() =>
     yaml.dump({
       openapi: "3.0.0",
@@ -443,15 +474,17 @@ export default function Canvas() {
           updateBlock={updateBlock}
           deleteBlock={deleteBlock}
           schemas={schemas}
+          duplicateBlock={duplicateBlock}
         />
       </div>
 
       <div className={styles.specViewer}>
         <div className={styles.specHeader}>
           <h3>Generated OpenAPI YAML</h3>
-          <button onClick={downloadYaml} className={styles.downloadBtn}>
-            Download YAML
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={downloadYaml} className={styles.downloadBtn}>Download YAML</button>
+            <button onClick={clearWorkspace} className={styles.deleteEndpointBtn}>Clear</button>
+          </div>
         </div>
         <YamlEditor yamlText={yamlSpec} onChange={(value) => setYamlSpec(value)} />
       </div>

@@ -2,7 +2,7 @@ import ResponseEditor from "./ResponseEditor";
 import ParametersEditor from "./ParametersEditor";
 import styles from "./Canvas.module.css";
 
-export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, schemas }) {
+export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, schemas, duplicateBlock }) {
   return (
     <>
       {blocks.map((block, idx) => (
@@ -13,6 +13,17 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
             <span className={styles.pathLabel}>{block.path || "/new-path"}</span>
 
             <div className={styles.summaryActions}>
+              {/* ✅ Duplicate */}
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); duplicateBlock?.(idx); }}
+                className={styles.addBtn}
+                title="Duplicate endpoint"
+              >
+                ⧉
+              </button>
+
+              {/* Delete */}
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); deleteBlock(idx); }}
@@ -21,6 +32,7 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               >
                 ✕
               </button>
+
               <span className={styles.chevron} aria-hidden>▸</span>
             </div>
           </summary>
