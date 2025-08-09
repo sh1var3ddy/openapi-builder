@@ -188,43 +188,49 @@ export default function SchemaBuilder({
                 {/* Enum editor */}
                 {field.type === "enum" && (
                   <div className={styles.enumEditor}>
-                    {(field.enum || []).map((val, eIdx) => (
-                      <div key={eIdx} className={styles.enumRow}>
-                        <input
-                          className={styles.metaInput}
-                          value={val}
-                          onChange={(e) =>
-                            updateField(sIdx, fIdx, "enum", [
-                              ...field.enum.slice(0, eIdx),
-                              e.target.value,
-                              ...field.enum.slice(eIdx + 1),
-                            ])
-                          }
-                          placeholder="Enum value"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = [...field.enum];
-                            updated.splice(eIdx, 1);
-                            updateField(sIdx, fIdx, "enum", updated);
-                          }}
-                          className={styles.inlineDeleteBtn}
-                          title="Remove enum value"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateField(sIdx, fIdx, "enum", [...(field.enum || []), ""])
-                      }
-                      className={styles.addBtn}
-                    >
-                      + Add Enum Value
-                    </button>
+                    <div className={styles.enumHeader}>
+                      <span>Enum values</span>
+                      <button
+                        type="button"
+                        className={styles.addBtn}
+                        onClick={() =>
+                          updateField(sIdx, fIdx, "enum", [...(field.enum || []), ""])
+                        }
+                      >
+                        + Add Value
+                      </button>
+                    </div>
+
+                    <div className={styles.enumList}>
+                      {(field.enum || []).map((val, eIdx) => (
+                        <div key={eIdx} className={styles.enumItem}>
+                          <input
+                            className={styles.metaInput}
+                            value={val}
+                            onChange={(e) =>
+                              updateField(sIdx, fIdx, "enum", [
+                                ...field.enum.slice(0, eIdx),
+                                e.target.value,
+                                ...field.enum.slice(eIdx + 1),
+                              ])
+                            }
+                            placeholder={`Value ${eIdx + 1}`}
+                          />
+                          <button
+                            type="button"
+                            className={styles.deleteBtn}
+                            onClick={() => {
+                              const updated = [...field.enum];
+                              updated.splice(eIdx, 1);
+                              updateField(sIdx, fIdx, "enum", updated);
+                            }}
+                            title="Remove value"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 

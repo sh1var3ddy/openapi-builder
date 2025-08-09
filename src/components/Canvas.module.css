@@ -131,7 +131,13 @@
 .fieldRow {
   display: flex;
   gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;           /* ⬅️ key */
   margin-bottom: 8px;
+}
+
+.fieldRow > * {
+  min-width: 160px;
 }
 
 .addBtn,
@@ -156,14 +162,40 @@
 }
 
 .enumEditor {
-  padding-left: 1rem;
-  margin-top: 0.5rem;
+  width: 100%;               /* ⬅️ full width row */
+  margin-top: 8px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.enumHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #1e293b;
 }
 
 .enumRow {
   display: flex;
   gap: 8px;
   margin-bottom: 4px;
+}
+
+.enumList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* ⬅️ responsive */
+  gap: 8px;
+}
+
+/* Each enum input with its delete button */
+.enumItem {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .chevron {
@@ -344,11 +376,4 @@
   padding: 4px 8px;
   font-weight: 700;
   cursor: pointer;
-}
-
-.fieldRow {
-  display: flex;
-  gap: 8px;
-  align-items: center; /* add this so buttons align vertically */
-  margin-bottom: 8px;
 }
