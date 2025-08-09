@@ -85,8 +85,10 @@ export default function Canvas() {
   const [openapi, setOpenapi] = useState({});
   const [schemas, setSchemas] = useState([]);
   const [editingSchemas, setEditingSchemas] = useState([]);
-  const [defaultTagsText, setDefaultTagsText] = useState(""); // ✅ default tags UI string
-
+  const [defaultTagsText, setDefaultTagsText] = useState("");
+  const discardDraft = (index) => {
+   setEditingSchemas((prev) => prev.filter((_, i) => i !== index));
+ };
   const parseTags = (txt) =>
     String(txt || "")
       .split(",")
@@ -139,7 +141,7 @@ export default function Canvas() {
     })
   );
 
-  // ✅ Load saved data on first render
+  // Load saved
   useEffect(() => {
     try {
       const savedBlocks = JSON.parse(localStorage.getItem("swaggerBlocks") || "[]");
@@ -148,24 +150,26 @@ export default function Canvas() {
       const savedDefaultTagsText = localStorage.getItem("swaggerDefaultTagsText") || "";
 
       if (Array.isArray(savedBlocks) && savedBlocks.length) setBlocks(savedBlocks);
-      if (Array.isArray(savedSchemas) && savedSchemas.length) setSchemas(savedSchemas);
+      if (Array.isArray(savedSchemas)) {
+        savedSchemas = savedSchemas.map((s) => ({
+          ...s,
+          schemaType: s?.schemaType || "object",
+          fields: (s?.fields || []).map((f) => ({ required: true, ...f })),
+        }));
+      }
       if (typeof savedYaml === "string" && savedYaml.trim()) setYamlSpec(savedYaml);
       setDefaultTagsText(savedDefaultTagsText);
-    } catch {
-      // ignore corrupted storage
-    }
+    } catch {}
   }, []);
 
-  // ✅ Save to localStorage whenever changes happen
+  // Save
   useEffect(() => {
     try {
       localStorage.setItem("swaggerBlocks", JSON.stringify(blocks));
       localStorage.setItem("swaggerSchemas", JSON.stringify(schemas));
       localStorage.setItem("swaggerYaml", yamlSpec);
       localStorage.setItem("swaggerDefaultTagsText", defaultTagsText);
-    } catch {
-      // storage might be full or blocked; ignore for now
-    }
+    } catch {}
   }, [blocks, schemas, yamlSpec, defaultTagsText]);
 
   const [{ isOver }, drop] = useDrop(() => ({
@@ -206,19 +210,20 @@ export default function Canvas() {
     setBlocks((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ---------- SCHEMA METHODS (UPDATED) ----------
+  // ---------- SCHEMA METHODS ----------
   const startNewSchema = () =>
     setEditingSchemas((prev) => [
       ...prev,
       {
         name: "",
-        schemaType: "object", // NEW
+        schemaType: "object",
         fields: [],
         enum: [],
         format: "",
         itemsType: "",
         itemsFormat: "",
         ref: "",
+        variants: [], // NEW: schema-level oneOf/anyOf variants
       },
     ]);
 
@@ -237,7 +242,7 @@ export default function Canvas() {
     setEditingSchemas((prev) =>
       prev.map((schema, i) => {
         if (i !== sIdx) return schema;
-        if (fIdx === -1) return { ...schema, [key]: value }; // NEW: schema-level
+        if (fIdx === -1) return { ...schema, [key]: value };
         const fields = [...(schema.fields || [])];
         fields[fIdx][key] = value;
         return { ...schema, fields };
@@ -267,6 +272,7 @@ export default function Canvas() {
       itemsType: draft.itemsType || "",
       itemsFormat: draft.itemsFormat || "",
       ref: draft.ref || "",
+      variants: draft.variants || [], // NEW
     };
 
     if (draft.__editId) {
@@ -299,7 +305,9 @@ export default function Canvas() {
         itemsType: s.itemsType || "",
         itemsFormat: s.itemsFormat || "",
         ref: s.ref || "",
-        fields: JSON.parse(JSON.stringify(s.fields || [])),
+        variants: s.variants || [],
+        // ✅ ensure each field gets a default required:true so the toggle shows properly
+        fields: JSON.parse(JSON.stringify(s.fields || [])).map((f) => ({ required: true, ...f })),
       },
     ]);
   };
@@ -332,13 +340,13 @@ export default function Canvas() {
 
   const deleteSchemaById = (id) => setSchemas((prev) => prev.filter((sc) => sc.id !== id));
 
-  // ✅ One-time backfill: ensure every saved schema has a unique id
+  // One-time backfill
   useEffect(() => {
     setSchemas((prev) => prev.map((s) => (s.id ? s : { ...s, id: uid() })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // rename propagation for refs everywhere
+  // rename propagation for refs everywhere (fields + schema-level ref + schema-level variants)
   const renameSchemaRefs = (oldName, newName) => {
     // endpoints
     setBlocks((prev) =>
@@ -354,22 +362,32 @@ export default function Canvas() {
         return nb;
       })
     );
-    // component schemas (fields/drafts)
-    const fixRefsInFields = (arr) =>
+
+    const fixRefs = (arr) =>
       arr.map((s) => ({
         ...s,
         fields: (s.fields || []).map((f) => {
           const nf = { ...f };
           if (nf.type === "$ref" && nf.ref === oldName) nf.ref = newName;
           if (nf.type === "array" && nf.itemsType === "$ref" && nf.ref === oldName) nf.ref = newName;
+          // field-level composition variants
+          if (Array.isArray(nf.variants)) {
+            nf.variants = nf.variants.map((v) =>
+              v.kind === "$ref" && v.ref === oldName ? { ...v, ref: newName } : v
+            );
+          }
           return nf;
         }),
-        // also schema-level ref
+        // schema-level ref
         ref: s.ref === oldName ? newName : s.ref,
+        // schema-level variants
+        variants: (s.variants || []).map((v) =>
+          v.kind === "$ref" && v.ref === oldName ? { ...v, ref: newName } : v
+        ),
       }));
 
-    setSchemas((prev) => fixRefsInFields(prev));
-    setEditingSchemas((prev) => fixRefsInFields(prev));
+    setSchemas((prev) => fixRefs(prev));
+    setEditingSchemas((prev) => fixRefs(prev));
   };
 
   /* ---------- Import: handlers ---------- */
@@ -384,14 +402,21 @@ export default function Canvas() {
       alert("Failed to read/parse file. Make sure it's valid OpenAPI YAML or JSON.");
       console.error(err);
     } finally {
-      e.target.value = ""; // allow re-selecting same file
+      e.target.value = "";
     }
   };
 
   const importOpenAPISpec = (spec) => {
     if (!spec || typeof spec !== "object") return;
 
-    // Schemas (UPDATED to support enum/primitive/array/$ref)
+    const toVariant = (v) => {
+      if (v?.$ref) return { kind: "$ref", ref: v.$ref.split("/").pop() };
+      if (v?.type === "number" && v?.format === "double")
+        return { kind: "primitive", type: "double", format: "double" };
+      return { kind: "primitive", type: v?.type || "string", format: v?.format || "" };
+    };
+
+    // Schemas
     const importedSchemas = [];
     const compSchemas = spec.components?.schemas || {};
 
@@ -408,6 +433,26 @@ export default function Canvas() {
           format: "",
           itemsType: "",
           itemsFormat: "",
+          variants: [],
+        });
+        return;
+      }
+
+      // Top-level oneOf / anyOf
+      if (Array.isArray(schema?.oneOf) || Array.isArray(schema?.anyOf)) {
+        const keyword = Array.isArray(schema.oneOf) ? "oneOf" : "anyOf";
+        const variants = (schema[keyword] || []).map(toVariant);
+        importedSchemas.push({
+          id: uid(),
+          name,
+          schemaType: keyword,
+          variants,
+          fields: [],
+          enum: [],
+          format: "",
+          itemsType: "",
+          itemsFormat: "",
+          ref: "",
         });
         return;
       }
@@ -424,6 +469,7 @@ export default function Canvas() {
           itemsType: "",
           itemsFormat: "",
           ref: "",
+          variants: [],
         });
         return;
       }
@@ -455,6 +501,7 @@ export default function Canvas() {
           fields: [],
           enum: [],
           format: "",
+          variants: [],
         });
         return;
       }
@@ -472,11 +519,12 @@ export default function Canvas() {
           itemsType: "",
           itemsFormat: "",
           ref: "",
+          variants: [],
         });
         return;
       }
 
-      // default: object with properties (existing behavior)
+      // default: object with properties
       const props = schema?.properties || {};
       const requiredList = schema?.required || [];
       const fields = Object.entries(props).map(([propName, node]) => toField(propName, node, requiredList));
@@ -490,10 +538,11 @@ export default function Canvas() {
         itemsType: "",
         itemsFormat: "",
         ref: "",
+        variants: [],
       });
     });
 
-    // Paths -> Blocks
+    // Paths -> Blocks (unchanged)
     const importedBlocks = [];
     const paths = spec.paths || {};
     Object.entries(paths).forEach(([path, methods]) => {
@@ -548,9 +597,7 @@ export default function Canvas() {
 
     try {
       setYamlSpec(yaml.dump(spec));
-    } catch {
-      // if dump fails, the next sync will rebuild from state
-    }
+    } catch {}
 
     try {
       localStorage.setItem("swaggerBlocks", JSON.stringify(importedBlocks));
@@ -561,7 +608,7 @@ export default function Canvas() {
   };
   /* ------------------------------------- */
 
-  // YAML SYNC (UPDATED to support schemaType)
+  // YAML SYNC
   useEffect(() => {
     try {
       const parsed = yaml.load(yamlSpec);
@@ -587,7 +634,7 @@ export default function Canvas() {
           responses: {},
         };
 
-        // Tags: endpoint-specific or default
+        // Tags
         const defaultTags = parseTags(defaultTagsText);
         const opTags = Array.isArray(block.tags) ? block.tags : parseTags(block.tagsText || "");
         if ((opTags && opTags.length) || defaultTags.length) {
@@ -620,7 +667,7 @@ export default function Canvas() {
           };
         }
 
-        // Custom Responses
+        // Responses
         if (responses.length > 0) {
           responses.forEach((res) => {
             const resp = { description: res.description || "" };
@@ -637,7 +684,6 @@ export default function Canvas() {
             methodObject.responses[res.status || "default"] = resp;
           });
         } else if (responseSchemaRef) {
-          // Default 200 response
           let schemaObj = {};
           if (responseSchemaRef.startsWith("ref:")) {
             schemaObj = { $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}` };
@@ -650,14 +696,13 @@ export default function Canvas() {
             content: { "application/json": { schema: schemaObj } },
           };
         } else {
-          // Fallback response
           methodObject.responses["200"] = { description: "Success" };
         }
 
         parsed.paths[path][method] = methodObject;
       });
 
-      // Components > Schemas (UPDATED)
+      // Components > Schemas
       parsed.components = parsed.components || {};
       parsed.components.schemas = {};
 
@@ -672,6 +717,14 @@ export default function Canvas() {
         return obj;
       };
 
+      const mapVariant = (v) => {
+        if (v.kind === "$ref" && v.ref) return { $ref: `#/components/schemas/${v.ref}` };
+        if (v.type === "double") return { type: "number", format: "double" };
+        const obj = { type: v.type || "string" };
+        if (v.format) obj.format = v.format;
+        return obj;
+      };
+
       schemas.forEach((schema) => {
         if (!schema.name) return;
         const kind = schema.schemaType || "object";
@@ -681,6 +734,12 @@ export default function Canvas() {
             type: "string",
             enum: (schema.enum || []).filter((v) => v?.trim()),
           };
+          return;
+        }
+
+        if (kind === "oneOf" || kind === "anyOf") {
+          const variants = (schema.variants || []).map(mapVariant).filter(Boolean);
+          parsed.components.schemas[schema.name] = { [kind]: variants };
           return;
         }
 
@@ -750,13 +809,7 @@ export default function Canvas() {
           } else if (field.type === "oneOf" || field.type === "anyOf") {
             const keyword = field.type;
             const variants = (field.variants || [])
-              .map((v) => {
-                if (v.kind === "$ref" && v.ref) return { $ref: `#/components/schemas/${v.ref}` };
-                if (v.type === "double") return { type: "number", format: "double" };
-                const obj = { type: v.type || "string" };
-                if (v.format) obj.format = v.format;
-                return obj;
-              })
+              .map((v) => mapVariant(v))
               .filter(Boolean);
             if (variants.length > 0) properties[field.name] = applyCommon({ [keyword]: variants });
           } else {
@@ -773,7 +826,7 @@ export default function Canvas() {
         };
       });
 
-      // Top-level tags array for Swagger UI groups
+      // Tags
       const allTagNames = new Set();
       Object.values(parsed.paths || {}).forEach((pathItem) => {
         Object.values(pathItem || {}).forEach((op) => {
@@ -811,7 +864,6 @@ export default function Canvas() {
         <div className={styles.specViewer}>
           <div className={styles.specHeader}>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {/* Default tags input */}
               <input
                 className={styles.metaInput}
                 style={{ width: 220 }}
@@ -820,7 +872,6 @@ export default function Canvas() {
                 onChange={(e) => setDefaultTagsText(e.target.value)}
                 title="Tags applied when an endpoint has none"
               />
-              {/* Import */}
               <label className={styles.addBtn} style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
                 Import
                 <input type="file" accept=".yaml,.yml,.json" onChange={onImportFile} style={{ display: "none" }} />
@@ -859,6 +910,7 @@ export default function Canvas() {
           startEditSchema={startEditSchema}
           duplicateSchema={duplicateSchema}
           deleteSchemaById={deleteSchemaById}
+          cancelDraft={discardDraft}
         />
       </div>
     </div>
