@@ -1,8 +1,15 @@
+// src/components/EndpointBuilder.jsx
 import ResponseEditor from "./ResponseEditor";
 import ParametersEditor from "./ParametersEditor";
 import styles from "./Canvas.module.css";
 
-export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, schemas }) {
+export default function EndpointBuilder({
+  blocks,
+  updateBlock,
+  deleteBlock,
+  schemas,
+  duplicateBlock,
+}) {
   return (
     <>
       {blocks.map((block, idx) => (
@@ -13,15 +20,37 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
             <span className={styles.pathLabel}>{block.path || "/new-path"}</span>
 
             <div className={styles.summaryActions}>
+              {/* Duplicate */}
               <button
                 type="button"
-                onClick={(e) => { e.preventDefault(); deleteBlock(idx); }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  duplicateBlock?.(idx);
+                }}
+                className={styles.addBtn}
+                title="Duplicate endpoint"
+                aria-label="Duplicate endpoint"
+              >
+                ⧉
+              </button>
+
+              {/* Delete */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  deleteBlock(idx);
+                }}
                 className={styles.deleteEndpointBtn}
                 title="Delete endpoint"
+                aria-label="Delete endpoint"
               >
                 ✕
               </button>
-              <span className={styles.chevron} aria-hidden>▸</span>
+
+              <span className={styles.chevron} aria-hidden>
+                ▸
+              </span>
             </div>
           </summary>
 
@@ -44,6 +73,15 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               placeholder="operationId"
             />
 
+            {/* Tags (comma-separated) */}
+            <input
+              className={styles.metaInput}
+              value={block.tagsText || ""}
+              onChange={(e) => updateBlock(idx, "tagsText", e.target.value)}
+              placeholder="Tags (comma-separated, e.g. payments,admin)"
+              title="Tags that group this endpoint in Swagger UI"
+            />
+
             <textarea
               className={styles.metaInput}
               value={block.description}
@@ -51,11 +89,12 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               placeholder="Description"
             />
 
-            {/* Request Schema */}
+            {/* Request Body Schema */}
             <select
               className={styles.metaInput}
               value={block.requestSchemaRef || ""}
               onChange={(e) => updateBlock(idx, "requestSchemaRef", e.target.value)}
+              title="Request body schema"
             >
               <option value="">No Request Body</option>
               <optgroup label="Primitive Types">
@@ -67,53 +106,24 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
               </optgroup>
               <optgroup label="Component Schemas">
                 {schemas.map((s) => (
-                  <option key={s.name} value={`ref:${s.name}`}>{s.name}</option>
+                  <option key={s.name} value={`ref:${s.name}`}>
+                    {s.name}
+                  </option>
                 ))}
               </optgroup>
             </select>
-
-            {/* Default 200 Response Schema */}
-            {/* <select
-              className={styles.metaInput}
-              value={block.responseSchemaRef || ""}
-              onChange={(e) => updateBlock(idx, "responseSchemaRef", e.target.value)}
-            >
-              <option value="">No Response Body</option>
-              <optgroup label="Primitive Types">
-                <option value="type:string">string</option>
-                <option value="type:integer">integer</option>
-                <option value="type:boolean">boolean</option>
-                <option value="type:number">number</option>
-                <option value="type:double">double</option>
-              </optgroup>
-              <optgroup label="Component Schemas">
-                {schemas.map((s) => (
-                  <option key={s.name} value={`ref:${s.name}`}>{s.name}</option>
-                ))}
-              </optgroup>
-            </select> */}
 
             {/* Parameters (collapsible) */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
                 <span className={styles.sectionTitle}>Parameters</span>
-                {/* <button
-                  type="button"
-                  className={styles.addBtn}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const next = [
-                      ...(block.parameters || []),
-                      { name: "", in: "query", required: false, description: "", type: "string" },
-                    ];
-                    updateBlock(idx, "parameters", next);
-                  }}
-                >
-                  + Add Parameter
-                </button> */}
               </summary>
               <div className={styles.sectionBody}>
-                <ParametersEditor block={block} idx={idx} updateBlock={updateBlock} />
+                <ParametersEditor
+                  block={block}
+                  idx={idx}
+                  updateBlock={updateBlock}
+                />
               </div>
             </details>
 
@@ -121,23 +131,14 @@ export default function EndpointBuilder({ blocks, updateBlock, deleteBlock, sche
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
                 <span className={styles.sectionTitle}>Responses</span>
-                {/* <button
-                  type="button"
-                  className={styles.addBtn}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const next = [
-                      ...(block.responses || []),
-                      { status: "200", description: "", schemaRef: "" },
-                    ];
-                    updateBlock(idx, "responses", next);
-                  }}
-                >
-                  + Add Response
-                </button> */}
               </summary>
               <div className={styles.sectionBody}>
-                <ResponseEditor block={block} idx={idx} updateBlock={updateBlock} schemas={schemas} />
+                <ResponseEditor
+                  block={block}
+                  idx={idx}
+                  updateBlock={updateBlock}
+                  schemas={schemas}
+                />
               </div>
             </details>
           </div>
