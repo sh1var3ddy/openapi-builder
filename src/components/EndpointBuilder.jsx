@@ -1,4 +1,3 @@
-// src/components/EndpointBuilder.jsx
 import ResponseEditor from "./ResponseEditor";
 import ParametersEditor from "./ParametersEditor";
 import styles from "./Canvas.module.css";
@@ -9,6 +8,7 @@ export default function EndpointBuilder({
   deleteBlock,
   schemas,
   duplicateBlock,
+  reusableParams = [], // NEW: reusable components.parameters
 }) {
   return (
     <>
@@ -147,6 +147,7 @@ export default function EndpointBuilder({
                   block={block}
                   idx={idx}
                   updateBlock={updateBlock}
+                  reusableParams={reusableParams} // NEW
                 />
               </div>
             </details>

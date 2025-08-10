@@ -386,3 +386,44 @@
   font-weight: 700;
   cursor: pointer;
 }
+/* Tabs container */
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+/* Base tab button */
+.tabButton {
+  appearance: none;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #111827;     /* slate-900 */
+  color: #e5e7eb;          /* gray-200 */
+  cursor: pointer;
+  transition: transform .05s ease, opacity .15s ease, background .2s ease;
+  opacity: 0.7;
+  font-weight: 600;
+}
+
+/* Hover */
+.tabButton:hover {
+  opacity: 1;
+}
+
+/* Active tab */
+.activeTab {
+  background: #f59e0b;     /* amber-500 */
+  color: #111827;          /* slate-900 */
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35) inset;
+  transform: translateY(-1px);
+}
+
+/* Optional tiny helper text used above */
+.hintText {
+  color: #64748b;          /* slate-500 */
+  font-size: 12px;
+}
