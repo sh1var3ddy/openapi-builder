@@ -19,12 +19,31 @@ function formatOptionsFor(type) {
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+/**
+ * Manages components.responses
+ * Draft shape:
+ * {
+ *   id, __editId?, key, description, mediaType,
+ *   schemaMode: 'none' | 'primitive' | 'ref',
+ *   primitiveType, primitiveFormat, refName,
+ *   headers: [
+ *     {
+ *       id, name, mode: 'ref' | 'inline',
+ *       refName?, description?,
+ *       type?, format?, enum?: string[],
+ *       minLength?, maxLength?, pattern?,
+ *       minimum?,  maximum?
+ *     }
+ *   ]
+ * }
+ */
 export default function ResponseBuilder({
   reusableResponses,
   setReusableResponses,
   editingResponses,
   setEditingResponses,
-  schemas = [],
+  schemas,
+  reusableHeaders,             // 👈 dropdown source
 }) {
   const startNew = () => {
     setEditingResponses(prev => [
@@ -32,16 +51,14 @@ export default function ResponseBuilder({
       {
         id: uid(),
         __editId: null,
-        key: "",                 // components.responses key (e.g., ErrorBadRequest)
+        key: "",
         description: "",
-        // content
-        schemaMode: "none",      // "none" | "primitive" | "ref"
         mediaType: "application/json",
+        schemaMode: "none",
         primitiveType: "string",
         primitiveFormat: "",
         refName: "",
-        // headers (array of items)
-        headers: [],             // [{ mode:"inline"|"ref", name, description, type, format, enum, minLength,maxLength,pattern,minimum,maximum, refName }]
+        headers: [],          // header entries (inline or ref)
       }
     ]);
   };
@@ -50,12 +67,13 @@ export default function ResponseBuilder({
     setEditingResponses(prev => prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r)));
   };
 
-  const discardDraft = (idx) => setEditingResponses(prev => prev.filter((_, i) => i !== idx));
+  const discardDraft = (idx) => {
+    setEditingResponses(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const submitDraft = (idx) => {
     const d = editingResponses[idx];
-    if (!d?.key) return alert("Response key is required (the reusable name under components.responses).");
-    if (!d?.description) return alert("Response description is required by the spec.");
+    if (!d?.key) return alert("Response key is required (name under components.responses).");
 
     const packed = { ...d };
     delete packed.__editId;
@@ -90,15 +108,15 @@ export default function ResponseBuilder({
     setReusableResponses(prev => prev.filter(r => r.id !== id));
   };
 
-  // ---- headers helpers ----
-  const addInlineHeader = (idx) => {
-    const list = [...(editingResponses[idx].headers || [])];
-    list.push({
+  // ----- Headers inside a response draft -----
+  const addHeader = (idx) => {
+    const h = {
       id: uid(),
-      mode: "inline",
-      name: "",
+      name: "",        // the actual HTTP header field name in the response map
+      mode: "ref",     // 'ref' | 'inline'
+      refName: "",     // key under components.headers when mode='ref'
       description: "",
-      type: "string",
+      type: "string",  // for inline
       format: "",
       enum: [],
       minLength: undefined,
@@ -106,24 +124,24 @@ export default function ResponseBuilder({
       pattern: "",
       minimum: undefined,
       maximum: undefined,
-    });
-    updateDraft(idx, "headers", list);
-  };
-
-  const addRefHeader = (idx) => {
-    const list = [...(editingResponses[idx].headers || [])];
-    list.push({ id: uid(), mode: "ref", name: "", refName: "" }); // name is the actual header name key in the map
-    updateDraft(idx, "headers", list);
+    };
+    updateDraft(idx, "headers", [ ...(editingResponses[idx].headers || []), h ]);
   };
 
   const updateHeader = (idx, hIdx, key, value) => {
-    const list = [...(editingResponses[idx].headers || [])];
+    const list = [ ...(editingResponses[idx].headers || []) ];
     list[hIdx] = { ...list[hIdx], [key]: value };
+
+    // If switching to 'ref' and header name is blank, default name to ref key
+    if (key === "refName" && list[hIdx].mode === "ref" && !list[hIdx].name) {
+      list[hIdx].name = value || "";
+    }
+
     updateDraft(idx, "headers", list);
   };
 
   const deleteHeader = (idx, hIdx) => {
-    const list = [...(editingResponses[idx].headers || [])];
+    const list = [ ...(editingResponses[idx].headers || []) ];
     list.splice(hIdx, 1);
     updateDraft(idx, "headers", list);
   };
@@ -151,7 +169,8 @@ export default function ResponseBuilder({
 
       {/* Draft editors */}
       {(editingResponses || []).map((d, idx) => {
-        const showPrimitiveFormat = ["string","integer","number","double","boolean"].includes(d.primitiveType);
+        const showPrimitive = d.schemaMode === "primitive";
+        const showRef       = d.schemaMode === "ref";
 
         return (
           <div key={d.id} className={styles.schemaBlock}>
@@ -164,96 +183,93 @@ export default function ResponseBuilder({
                 title="Name under components.responses"
               />
               <button className={styles.inlineDeleteBtn} onClick={() => discardDraft(idx)}>Discard</button>
+              {d.__editId && <span className={styles.editBadge}>Editing</span>}
             </div>
 
-            <textarea
+            <input
               className={styles.metaInput}
-              placeholder="Description (required)"
+              placeholder="Description"
               value={d.description || ""}
               onChange={(e) => updateDraft(idx, "description", e.target.value)}
             />
 
-            {/* Content (optional) */}
-            <details className={styles.section} open>
-              <summary className={styles.sectionSummary}>
-                <span className={styles.sectionTitle}>Content (optional)</span>
-              </summary>
-              <div className={styles.sectionBody}>
-                <div className={styles.fieldRow}>
-                  <select
-                    className={styles.metaInput}
-                    value={d.schemaMode}
-                    onChange={(e) => updateDraft(idx, "schemaMode", e.target.value)}
-                    title="How to define the response body schema"
-                  >
-                    <option value="none">None</option>
-                    <option value="primitive">Primitive</option>
-                    <option value="ref">Schema $ref</option>
-                  </select>
+            {/* Content schema mode */}
+            <div className={styles.fieldRow}>
+              <select
+                className={styles.metaInput}
+                value={d.schemaMode || "none"}
+                onChange={(e) => updateDraft(idx, "schemaMode", e.target.value)}
+                title="Response content schema"
+              >
+                <option value="none">No Content</option>
+                <option value="primitive">Primitive</option>
+                <option value="ref">Schema $ref</option>
+              </select>
 
-                  <input
-                    className={styles.metaInput}
-                    placeholder="media type (default application/json)"
-                    value={d.mediaType || ""}
-                    onChange={(e) => updateDraft(idx, "mediaType", e.target.value)}
-                    title="e.g., application/json, text/plain"
-                  />
-                </div>
+              {/* media type when content exists */}
+              {d.schemaMode !== "none" && (
+                <input
+                  className={styles.metaInput}
+                  placeholder="Media type (e.g., application/json)"
+                  value={d.mediaType || "application/json"}
+                  onChange={(e) => updateDraft(idx, "mediaType", e.target.value)}
+                />
+              )}
+            </div>
 
-                {d.schemaMode === "primitive" && (
-                  <div className={styles.fieldRow}>
-                    <select
-                      className={styles.metaInput}
-                      value={d.primitiveType || "string"}
-                      onChange={(e) => updateDraft(idx, "primitiveType", e.target.value)}
-                    >
-                      <option value="string">string</option>
-                      <option value="integer">integer</option>
-                      <option value="boolean">boolean</option>
-                      <option value="number">number</option>
-                      <option value="double">double</option>
-                    </select>
+            {/* Primitive schema config */}
+            {showPrimitive && (
+              <div className={styles.fieldRow}>
+                <select
+                  className={styles.metaInput}
+                  value={d.primitiveType || "string"}
+                  onChange={(e) => updateDraft(idx, "primitiveType", e.target.value)}
+                >
+                  <option value="string">string</option>
+                  <option value="integer">integer</option>
+                  <option value="boolean">boolean</option>
+                  <option value="number">number</option>
+                  <option value="double">double</option>
+                </select>
 
-                    {showPrimitiveFormat && (
-                      <select
-                        className={styles.metaInput}
-                        value={d.primitiveFormat || ""}
-                        onChange={(e) => updateDraft(idx, "primitiveFormat", e.target.value)}
-                        title="Format (optional)"
-                      >
-                        {formatOptionsFor(d.primitiveType === "double" ? "double" : d.primitiveType)
-                          .map((opt) => <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>)}
-                      </select>
-                    )}
-                  </div>
-                )}
-
-                {d.schemaMode === "ref" && (
-                  <div className={styles.fieldRow}>
-                    <select
-                      className={styles.metaInput}
-                      value={d.refName || ""}
-                      onChange={(e) => updateDraft(idx, "refName", e.target.value)}
-                    >
-                      <option value="">-- Select Schema --</option>
-                      {(schemas || []).map((s) => (
-                        <option key={s.name} value={s.name}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <select
+                  className={styles.metaInput}
+                  value={d.primitiveFormat || ""}
+                  onChange={(e) => updateDraft(idx, "primitiveFormat", e.target.value)}
+                >
+                  {formatOptionsFor(d.primitiveType === "double" ? "double" : d.primitiveType || "string").map((opt) => (
+                    <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
+                  ))}
+                </select>
               </div>
-            </details>
+            )}
 
-            {/* Headers (optional) */}
+            {/* $ref schema config */}
+            {showRef && (
+              <div className={styles.fieldRow}>
+                <select
+                  className={styles.metaInput}
+                  value={d.refName || ""}
+                  onChange={(e) => updateDraft(idx, "refName", e.target.value)}
+                  title="Pick a schema to reference"
+                >
+                  <option value="">-- Select Schema --</option>
+                  {(schemas || []).map((s) => (
+                    <option key={s.name} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Headers section */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
-                <span className={styles.sectionTitle}>Headers (optional)</span>
+                <span className={styles.sectionTitle}>Headers</span>
               </summary>
               <div className={styles.sectionBody}>
-                <div className={styles.fieldRow}>
-                  <button className={styles.addBtn} onClick={() => addInlineHeader(idx)}>+ Add Inline Header</button>
-                  <button className={styles.addBtn} onClick={() => addRefHeader(idx)}>+ Add $ref Header</button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong>Response headers</strong>
+                  <button className={styles.addBtn} onClick={() => addHeader(idx)}>+ Add Header</button>
                 </div>
 
                 {(d.headers || []).length === 0 && (
@@ -261,41 +277,52 @@ export default function ResponseBuilder({
                 )}
 
                 {(d.headers || []).map((h, hIdx) => {
-                  const isRef = h.mode === "ref";
+                  const showStringValidations = h.type === "string";
+                  const showNumberValidations = h.type === "number" || h.type === "integer" || h.type === "double";
+
                   return (
                     <div key={h.id} className={styles.schemaBlock} style={{ marginTop: 8 }}>
                       <div className={styles.fieldRow}>
-                        <select
-                          className={styles.metaInput}
-                          value={h.mode || "inline"}
-                          onChange={(e) => updateHeader(idx, hIdx, "mode", e.target.value)}
-                        >
-                          <option value="inline">Inline</option>
-                          <option value="ref">$ref</option>
-                        </select>
-
-                        {/* Header map key (actual header name in the response headers map) */}
                         <input
                           className={styles.metaInput}
-                          placeholder="Header name (e.g., Cache-Control)"
-                          value={h.name || ""}
+                          placeholder='Header name (e.g., "Cache-Control")'
+                          value={h.name}
                           onChange={(e) => updateHeader(idx, hIdx, "name", e.target.value)}
+                          title="Map key under responses[*].headers"
                         />
+
+                        <select
+                          className={styles.metaInput}
+                          value={h.mode || "ref"}
+                          onChange={(e) => updateHeader(idx, hIdx, "mode", e.target.value)}
+                        >
+                          <option value="ref">Reference (components.headers)</option>
+                          <option value="inline">Inline schema</option>
+                        </select>
 
                         <button className={styles.inlineDeleteBtn} onClick={() => deleteHeader(idx, hIdx)}>✕</button>
                       </div>
 
-                      {isRef ? (
+                      {/* Reference picker */}
+                      {h.mode === "ref" && (
                         <div className={styles.fieldRow}>
-                          <input
+                          <select
                             className={styles.metaInput}
-                            placeholder="components.headers key (e.g., CacheControlHeader)"
                             value={h.refName || ""}
                             onChange={(e) => updateHeader(idx, hIdx, "refName", e.target.value)}
-                            title="This should match a key under components.headers"
-                          />
+                            title="Pick a reusable header"
+                          >
+                            <option value="">-- Select Reusable Header --</option>
+                            {(reusableHeaders || []).map((rh) => (
+                              <option key={rh.id} value={rh.key}>{rh.key}</option>
+                            ))}
+                          </select>
+                          <span className={styles.hintText}>This will emit <code>$ref: #/components/headers/&lt;key&gt;</code></span>
                         </div>
-                      ) : (
+                      )}
+
+                      {/* Inline header schema */}
+                      {h.mode === "inline" && (
                         <>
                           <input
                             className={styles.metaInput}
@@ -323,52 +350,67 @@ export default function ResponseBuilder({
                               onChange={(e) => updateHeader(idx, hIdx, "format", e.target.value)}
                               title="Format (optional)"
                             >
-                              {formatOptionsFor(h.type === "double" ? "double" : (h.type || "string"))
-                                .map((opt) => <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>)}
+                              {formatOptionsFor(h.type === "double" ? "double" : h.type || "string").map((opt) => (
+                                <option key={opt || "none"} value={opt}>{opt || "— format —"}</option>
+                              ))}
                             </select>
                           </div>
 
-                          {/* Enum + validations (optional) */}
-                          <div className={styles.enumEditor}>
-                            <div className={styles.enumHeader}>
-                              <span>Enum values (optional)</span>
+                          {/* Optional enum */}
+                          {(Array.isArray(h.enum) && h.enum.length > 0) ? (
+                            <div className={styles.enumEditor}>
+                              <div className={styles.enumHeader}>
+                                <span>Enum values</span>
+                                <button
+                                  className={styles.addBtn}
+                                  onClick={() => updateHeader(idx, hIdx, "enum", [...(h.enum || []), ""])}
+                                >
+                                  + Add Value
+                                </button>
+                              </div>
+                              <div className={styles.enumList}>
+                                {(h.enum || []).map((val, eIdx) => (
+                                  <div key={eIdx} className={styles.enumItem}>
+                                    <input
+                                      className={styles.metaInput}
+                                      value={val}
+                                      onChange={(e) => {
+                                        const next = [...(h.enum || [])];
+                                        next[eIdx] = e.target.value;
+                                        updateHeader(idx, hIdx, "enum", next);
+                                      }}
+                                      placeholder={`Value ${eIdx + 1}`}
+                                    />
+                                    <button
+                                      className={styles.deleteBtn}
+                                      onClick={() => {
+                                        const next = [...(h.enum || [])];
+                                        next.splice(eIdx, 1);
+                                        updateHeader(idx, hIdx, "enum", next);
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={styles.fieldRow}>
                               <button
                                 className={styles.addBtn}
-                                onClick={() => updateHeader(idx, hIdx, "enum", [...(h.enum || []), ""])}
+                                onClick={() => updateHeader(idx, hIdx, "enum", [""])}
+                                title="Add enum values (optional)"
                               >
-                                + Add Value
+                                + Add enum
                               </button>
+                              <span className={styles.hintText}>optional</span>
                             </div>
-                            <div className={styles.enumList}>
-                              {(h.enum || []).map((val, eIdx) => (
-                                <div key={eIdx} className={styles.enumItem}>
-                                  <input
-                                    className={styles.metaInput}
-                                    value={val}
-                                    onChange={(e) => {
-                                      const next = [...(h.enum || [])];
-                                      next[eIdx] = e.target.value;
-                                      updateHeader(idx, hIdx, "enum", next);
-                                    }}
-                                    placeholder={`Value ${eIdx + 1}`}
-                                  />
-                                  <button
-                                    className={styles.deleteBtn}
-                                    onClick={() => {
-                                      const next = [...(h.enum || [])];
-                                      next.splice(eIdx, 1);
-                                      updateHeader(idx, hIdx, "enum", next);
-                                    }}
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                          )}
 
+                          {/* Validations */}
                           <div className={styles.fieldRow}>
-                            {(h.type === "string") && (
+                            {showStringValidations && (
                               <>
                                 <input
                                   className={styles.metaInput}
@@ -397,7 +439,7 @@ export default function ResponseBuilder({
                               </>
                             )}
 
-                            {(h.type === "number" || h.type === "integer" || h.type === "double") && (
+                            {showNumberValidations && (
                               <>
                                 <input
                                   className={styles.metaInput}
