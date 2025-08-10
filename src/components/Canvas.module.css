@@ -18,14 +18,24 @@
 
 /* Bottom row: schema builder full width */
 .bottomRow {
-  /* Give it some height; adjust as you like */
-  max-height: 40vh;         /* optional: cap, or remove for natural height */
-  overflow: auto;           /* scroll if it grows */
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #fff;
+  /* height will be set inline from React */
+  overflow: hidden;            /* hide while animating height */
+  transition: height 120ms ease, padding 120ms ease, border-color 120ms ease;
   padding: 8px;
+  box-sizing: border-box;
+  min-height: 260px;
 }
+
+.bottomRow.collapsed {
+  height: 0 !important;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
+}
+
 
 /* Ensure panels can scroll within their grid cells */
 .canvas,
@@ -426,4 +436,62 @@
 .hintText {
   color: #64748b;          /* slate-500 */
   font-size: 12px;
+}
+
+.componentsToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.componentsToolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.componentsToolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbarBtn {
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.componentsInner {
+  height: calc(100% - 34px);  /* leave room for toolbar */
+  overflow: auto;
+}
+
+/* Horizontal resize handle that sits on the top edge of the panel */
+.resizeHandle {
+  position: relative;
+  height: 8px;
+  margin: -8px -8px 8px -8px; /* extend to full width including panel padding */
+  cursor: row-resize;
+  background: linear-gradient(to bottom, transparent 0, #e2e8f0 100%);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+/* Optional: a small grabber line inside the handle */
+.resizeGrip {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 60px;
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: #cbd5e1;
+  opacity: 0.9;
 }

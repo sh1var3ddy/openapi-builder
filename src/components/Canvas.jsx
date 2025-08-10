@@ -1,6 +1,6 @@
 // src/components/Canvas.jsx
 import { useDrop } from "react-dnd";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import styles from "./Canvas.module.css";
 import yaml from "js-yaml";
 import YamlEditor from "./YamlEditor";
@@ -146,6 +146,35 @@ export default function Canvas() {
       paths: {},
     })
   );
+
+  const [componentsHeight, setComponentsHeight] = useState(360);   // starting height in px
+  const [componentsCollapsed, setComponentsCollapsed] = useState(false);
+  const dragStartYRef = useRef(null);
+  const dragStartHRef = useRef(null);
+  const onResizeStart = (e) => {
+    // don’t start a drag when collapsed
+    if (componentsCollapsed) setComponentsCollapsed(false);
+    dragStartYRef.current = e.clientY;
+    dragStartHRef.current = componentsHeight;
+
+    window.addEventListener("mousemove", onResizing);
+    window.addEventListener("mouseup", onResizeEnd);
+  };
+
+  const onResizing = (e) => {
+    const dy = e.clientY - (dragStartYRef.current ?? e.clientY);
+    // invert dy because handle is at the TOP of the panel
+    const next = Math.max(160, Math.min(window.innerHeight * 0.8, (dragStartHRef.current ?? 360) - dy));
+    setComponentsHeight(next);
+  };
+
+  const onResizeEnd = () => {
+    window.removeEventListener("mousemove", onResizing);
+    window.removeEventListener("mouseup", onResizeEnd);
+  };
+
+  const toggleCollapsed = () => setComponentsCollapsed(v => !v);
+  const resetHeight = () => setComponentsHeight(360);
 
   const parseTags = (txt) =>
     String(txt || "")
@@ -1411,62 +1440,92 @@ export default function Canvas() {
       </div>
 
       {/* BOTTOM: tabbed Components panel */}
-      <div className={styles.bottomRow}>
-        <ComponentsPanel
-          schemaProps={{
-            schemas,
-            editingSchemas,
-            updateSchemaName,
-            addField,
-            updateField,
-            deleteField,
-            submitSchema,
-            startNewSchema,
-            startEditSchema,
-            duplicateSchema,
-            deleteSchemaById,
-            cancelDraft,
-          }}
-          parameterProps={{
-            reusableParams,
-            setReusableParams,
-            editingParams,
-            setEditingParams,
-          }}
-          responseProps={{
-            reusableResponses,
-            setReusableResponses,
-            editingResponses,
-            setEditingResponses,
-            schemas,
-            reusableHeaders,
-          }}
-          requestBodyProps={{
-            reusableRequestBodies,
-            setReusableRequestBodies,
-            editingRequestBodies,
-            setEditingRequestBodies,
-            schemas,
-          }}
-          headerProps={{
-            reusableHeaders,
-            setReusableHeaders,
-            editingHeaders,
-            setEditingHeaders,
-          }}
-          exampleProps={{
-            reusableExamples,
-            setReusableExamples,
-            editingExamples,
-            setEditingExamples,
-          }}
-          securityProps={{
-            reusableSecurity,
-            setReusableSecurity,
-            editingSecurity,
-            setEditingSecurity,
-          }}
-        />
+      <div
+        className={`${styles.bottomRow} ${componentsCollapsed ? styles.collapsed : ""}`}
+        style={{ height: componentsCollapsed ? 0 : componentsHeight }}
+      >
+        {/* drag handle */}
+        <div className={styles.resizeHandle} onMouseDown={onResizeStart}>
+          <div className={styles.resizeGrip} />
+        </div>
+
+        {/* toolbar */}
+        <div className={styles.componentsToolbar}>
+          <div className={styles.componentsToolbarLeft}>
+            <strong>Components</strong>
+          </div>
+          <div className={styles.componentsToolbarRight}>
+            <button
+              type="button"
+              className={styles.toolbarBtn}
+              onClick={resetHeight}
+              title="Reset panel height to default"
+            >
+              Reset height
+            </button>
+            <button
+              type="button"
+              className={styles.toolbarBtn}
+              onClick={toggleCollapsed}
+              title={componentsCollapsed ? "Expand panel" : "Collapse panel"}
+            >
+              {componentsCollapsed ? "Expand" : "Collapse"}
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.componentsInner}>
+          <ComponentsPanel
+            schemaProps={{
+              schemas,
+              editingSchemas,
+              updateSchemaName,
+              addField,
+              updateField,
+              deleteField,
+              submitSchema,
+              startNewSchema,
+              startEditSchema,
+              duplicateSchema,
+              deleteSchemaById,
+              cancelDraft,
+            }}
+            parameterProps={{
+              reusableParams,
+              setReusableParams,
+              editingParams,
+              setEditingParams,
+            }}
+            responseProps={{
+              reusableResponses,
+              setReusableResponses,
+              editingResponses,
+              setEditingResponses,
+              schemas,
+              reusableHeaders,
+            }}
+            requestBodyProps={{
+              reusableRequestBodies,
+              setReusableRequestBodies,
+              editingRequestBodies,
+              setEditingRequestBodies,
+              schemas,
+            }}
+            headerProps={{
+              reusableHeaders,
+              setReusableHeaders,
+              editingHeaders,
+              setEditingHeaders,
+            }}
+            // if you already have security schemes tab, pass those props here too
+            securityProps={{
+              reusableSecurity,
+              setReusableSecurity,
+              editingSecurity,
+              setEditingSecurity,
+            }}
+          />
+        </div>
       </div>
     </div>
   );
