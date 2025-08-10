@@ -5,47 +5,49 @@ import SchemaBuilder from "./SchemaBuilder";
 import ParameterBuilder from "./ParameterBuilder";
 import ResponseBuilder from "./ResponseBuilder";
 import RequestBodyBuilder from "./RequestBodyBuilder";
+import HeaderBuilder from "./HeaderBuilder";
 
-const TABS = [
-  { key: "schemas", label: "Schemas" },
-  { key: "parameters", label: "Parameters" },
-  { key: "responses", label: "Responses" },
-  { key: "requestBodies", label: "Request Bodies" },
-  // Later: headers, examples, links, callbacks, securitySchemes
-];
+export default function ComponentsPanel({
+  schemaProps,
+  parameterProps,
+  responseProps,
+  requestBodyProps,
+  headerProps,
+}) {
+  const [activeTab, setActiveTab] = useState("schemas");
 
-export default function ComponentsPanel(props) {
-  const [tab, setTab] = useState("schemas");
+  const tabs = [
+    { key: "schemas", label: "Schemas" },
+    { key: "parameters", label: "Parameters" },
+    { key: "responses", label: "Responses" },
+    { key: "requestBodies", label: "Request Bodies" },
+    { key: "headers", label: "Headers" },
+  ];
 
   return (
-    <div className={styles.schemaPanel}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        {TABS.map(t => (
+    <div className={styles.componentsPanel}>
+      {/* Tab buttons */}
+      <div className={styles.tabs}>
+        {tabs.map((tab) => (
           <button
-            key={t.key}
-            className={tab === t.key ? styles.saveBtn : styles.addBtn}
-            onClick={() => setTab(t.key)}
+            key={tab.key}
+            className={`${styles.tabButton} ${activeTab === tab.key ? styles.activeTab : ""}`}
+            onClick={() => setActiveTab(tab.key)}
+            type="button"
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {tab === "schemas" && (
-        <SchemaBuilder {...props.schemaProps} />
-      )}
-
-      {tab === "parameters" && (
-        <ParameterBuilder {...props.parameterProps} />
-      )}
-
-      {tab === "responses" && (
-        <ResponseBuilder {...props.responseProps} />
-      )}
-
-      {tab === "requestBodies" && (
-        <RequestBodyBuilder {...props.requestBodyProps} />
-      )}
+      {/* Tab content */}
+      <div className={styles.tabContent}>
+        {activeTab === "schemas" && <SchemaBuilder {...schemaProps} />}
+        {activeTab === "parameters" && <ParameterBuilder {...parameterProps} />}
+        {activeTab === "responses" && <ResponseBuilder {...responseProps} />}
+        {activeTab === "requestBodies" && <RequestBodyBuilder {...requestBodyProps} />}
+        {activeTab === "headers" && <HeaderBuilder {...headerProps} />}
+      </div>
     </div>
   );
 }

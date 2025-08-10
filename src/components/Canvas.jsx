@@ -76,6 +76,8 @@ export default function Canvas() {
   const [editingResponses, setEditingResponses] = useState([]);
   const [reusableRequestBodies, setReusableRequestBodies] = useState([]);
   const [editingRequestBodies, setEditingRequestBodies] = useState([]);
+  const [reusableHeaders, setReusableHeaders] = useState([]);
+  const [editingHeaders, setEditingHeaders] = useState([]);
 
   const [yamlSpec, setYamlSpec] = useState(() =>
     yaml.dump({
@@ -107,6 +109,8 @@ export default function Canvas() {
     setEditingResponses([]);
     setReusableRequestBodies([]);
     setEditingRequestBodies([]);
+    setReusableHeaders([]);
+    setEditingHeaders([]);
     setYamlSpec(
       yaml.dump({
         openapi: "3.0.0",
@@ -115,6 +119,7 @@ export default function Canvas() {
         paths: {},
       })
     );
+    localStorage.removeItem("swaggerHeaders");
     localStorage.removeItem("swaggerBlocks");
     localStorage.removeItem("swaggerSchemas");
     localStorage.removeItem("swaggerYaml");
@@ -146,6 +151,8 @@ export default function Canvas() {
       const savedParams = JSON.parse(localStorage.getItem("swaggerParams") || "[]");
       const savedResps = JSON.parse(localStorage.getItem("swaggerResponses") || "[]");
       const savedReqBodies = JSON.parse(localStorage.getItem("swaggerRequestBodies") || "[]");
+      const savedHeaders = JSON.parse(localStorage.getItem("swaggerHeaders") || "[]");
+      if (Array.isArray(savedHeaders)) setReusableHeaders(savedHeaders);
 
       if (Array.isArray(savedBlocks) && savedBlocks.length) setBlocks(savedBlocks);
       if (Array.isArray(savedSchemas) && savedSchemas.length) setSchemas(savedSchemas);
@@ -168,8 +175,9 @@ export default function Canvas() {
       localStorage.setItem("swaggerParams", JSON.stringify(reusableParams));
       localStorage.setItem("swaggerResponses", JSON.stringify(reusableResponses));
       localStorage.setItem("swaggerRequestBodies", JSON.stringify(reusableRequestBodies));
+      localStorage.setItem("swaggerHeaders", JSON.stringify(reusableHeaders));
     } catch {}
-  }, [blocks, schemas, yamlSpec, defaultTagsText, reusableParams, reusableResponses, reusableRequestBodies]);
+  }, [blocks, schemas, yamlSpec, defaultTagsText, reusableParams, reusableResponses, reusableRequestBodies, reusableHeaders]);
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "method",
@@ -694,15 +702,68 @@ export default function Canvas() {
       // components.responses
       parsed.components.responses = {};
       (reusableResponses || []).forEach((r) => {
-        let content;
+        // Build optional content
+        let contentObj;
         if (r.schemaMode === "primitive") {
           const t = r.primitiveType === "double" ? { type: "number", format: "double" } : { type: r.primitiveType };
           if (r.primitiveFormat) t.format = r.primitiveFormat;
-          content = { [r.mediaType || "application/json"]: { schema: t } };
+          contentObj = { [r.mediaType || "application/json"]: { schema: t } };
         } else if (r.schemaMode === "ref" && r.refName) {
-          content = { [r.mediaType || "application/json"]: { schema: { $ref: `#/components/schemas/${r.refName}` } } };
+          contentObj = { [r.mediaType || "application/json"]: { schema: { $ref: `#/components/schemas/${r.refName}` } } };
         }
-        parsed.components.responses[r.key] = { description: r.description || "", ...(content ? { content } : {}) };
+
+        // Build optional headers
+        const headersList = r.headers || [];
+        let headersObj;
+        if (headersList.length) {
+          headersObj = {};
+          headersList.forEach((h) => {
+            if (!h?.name) return; // header map key
+            if (h.mode === "ref" && h.refName) {
+              headersObj[h.name] = { $ref: `#/components/headers/${h.refName}` };
+            } else if (h.mode === "inline") {
+              const schema = h.type === "double" ? { type: "number", format: "double" } : { type: h.type || "string" };
+              if (h.format) schema.format = h.format;
+              if (h.minLength != null) schema.minLength = h.minLength;
+              if (h.maxLength != null) schema.maxLength = h.maxLength;
+              if (h.pattern) schema.pattern = h.pattern;
+              if (h.minimum != null) schema.minimum = h.minimum;
+              if (h.maximum != null) schema.maximum = h.maximum;
+              if (Array.isArray(h.enum) && h.enum.length) schema.enum = h.enum;
+
+              headersObj[h.name] = {
+                ...(h.description ? { description: h.description } : {}),
+                schema,
+              };
+            }
+          });
+        }
+
+        parsed.components.responses[r.key] = {
+          description: r.description || "",
+          ...(contentObj ? { content: contentObj } : {}),
+          ...(headersObj ? { headers: headersObj } : {}),
+        };
+      });
+
+      parsed.components.headers = {};
+      (reusableHeaders || []).forEach((h) => {
+        const schema = h.type === "double" ? { type: "number", format: "double" } : { type: h.type || "string" };
+        if (h.format) schema.format = h.format;
+        if (h.minLength != null) schema.minLength = h.minLength;
+        if (h.maxLength != null) schema.maxLength = h.maxLength;
+        if (h.pattern) schema.pattern = h.pattern;
+        if (h.minimum != null) schema.minimum = h.minimum;
+        if (h.maximum != null) schema.maximum = h.maximum;
+        if (Array.isArray(h.enum) && h.enum.length) schema.enum = h.enum;
+
+        parsed.components.headers[h.key] = {
+          ...(h.description ? { description: h.description } : {}),
+          ...(h.style ? { style: h.style } : {}),
+          ...(h.explode != null ? { explode: !!h.explode } : {}),
+          schema,
+          ...(h.example ? { example: h.example } : {}),
+        };
       });
 
       // components.requestBodies
@@ -736,7 +797,7 @@ export default function Canvas() {
     } catch (e) {
       console.error("Failed to parse or update YAML", e);
     }
-  }, [blocks, schemas, defaultTagsText, reusableParams, reusableResponses, reusableRequestBodies, yamlSpec]);
+  }, [blocks, schemas, defaultTagsText, reusableParams, reusableResponses, reusableRequestBodies, yamlSpec, reusableHeaders]);
 
   return (
     <div className={styles.canvasContainer}>
@@ -825,6 +886,12 @@ export default function Canvas() {
             editingRequestBodies,
             setEditingRequestBodies,
             schemas,
+          }}
+          headerProps={{
+            reusableHeaders,
+            setReusableHeaders,
+            editingHeaders,
+            setEditingHeaders,
           }}
         />
       </div>
