@@ -6,6 +6,8 @@ import ParameterBuilder from "./ParameterBuilder";
 import ResponseBuilder from "./ResponseBuilder";
 import RequestBodyBuilder from "./RequestBodyBuilder";
 import HeaderBuilder from "./HeaderBuilder";
+import ExamplesBuilder from "./ExamplesBuilder";
+import SecuritySchemesBuilder from "./SecuritySchemesBuilder";
 
 export default function ComponentsPanel({
   schemaProps,
@@ -13,6 +15,8 @@ export default function ComponentsPanel({
   responseProps,
   requestBodyProps,
   headerProps,
+  exampleProps,
+  securityProps,
 }) {
   const [activeTab, setActiveTab] = useState("schemas");
 
@@ -22,6 +26,8 @@ export default function ComponentsPanel({
     { key: "responses", label: "Responses" },
     { key: "requestBodies", label: "Request Bodies" },
     { key: "headers", label: "Headers" },
+    { key: "examples", label: "Examples" },
+    { key: "security", label: "Security Schemes" },
   ];
 
   return (
@@ -47,6 +53,8 @@ export default function ComponentsPanel({
         {activeTab === "responses" && <ResponseBuilder {...responseProps} />}
         {activeTab === "requestBodies" && <RequestBodyBuilder {...requestBodyProps} />}
         {activeTab === "headers" && <HeaderBuilder {...headerProps} />}
+        {activeTab === "examples" && <ExamplesBuilder {...exampleProps} />}
+        {activeTab === "security" && <SecuritySchemesBuilder {...securityProps} />}
       </div>
     </div>
   );

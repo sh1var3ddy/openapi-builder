@@ -198,7 +198,7 @@ export default function HeaderBuilder({
             </div>
 
             {/* Enum */}
-            <div className={styles.enumEditor}>
+            {/* <div className={styles.enumEditor}>
               <div className={styles.enumHeader}>
                 <span>Enum values (optional)</span>
                 <button
@@ -234,7 +234,7 @@ export default function HeaderBuilder({
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
 
             {/* Validations */}
             <div className={styles.fieldRow}>
