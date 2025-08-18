@@ -286,7 +286,7 @@ export default function Canvas() {
       if (Array.isArray(savedReqBodies)) setReusableRequestBodies(savedReqBodies);
       if (Array.isArray(savedHeaders)) setReusableHeaders(savedHeaders);
       if (Array.isArray(savedExamples)) setReusableExamples(savedExamples);
-      if (Array.isArray(savedSec)) setReusableSecuritys(savedSec);
+      if (Array.isArray(savedSec)) setReusableSecurity(savedSec);
     } catch {}
   }, []);
 
@@ -902,13 +902,44 @@ export default function Canvas() {
 
     // ---------- components.examples ----------
     const compExamples = spec.components?.examples || {};
-    const importedExamples = Object.entries(compExamples).map(([key, ex]) => ({
-      id: uid(),
-      key,
-      summary: ex?.summary || "",
-      value: ex?.value,
-      externalValue: ex?.externalValue || "",
-    }));
+   const importedExamples = Object.entries(compExamples).map(([key, ex]) => {
+      // externalValue wins per spec
+      if (ex?.externalValue) {
+        return {
+          id: uid(),
+          key,
+          summary: ex?.summary || "",
+          mode: "external",
+          externalValue: ex.externalValue,
+          valueJson: "",
+          structuredValue: undefined,
+      };
+      }
+      // If a literal value exists, prefer raw JSON mode for fidelity.
+      if (Object.prototype.hasOwnProperty.call(ex || {}, "value")) {
+        let valueJson = "";
+        try { valueJson = JSON.stringify(ex.value ?? null, null, 2); } catch {}
+        return {
+          id: uid(),
+          key,
+          summary: ex?.summary || "",
+          mode: "raw",
+          valueJson,
+          externalValue: "",
+          structuredValue: undefined,
+        };
+      }
+      // Fallback to empty form example
+      return {
+        id: uid(),
+        key,
+        summary: ex?.summary || "",
+        mode: "form",
+        structuredValue: undefined,
+        valueJson: "",
+        externalValue: "",
+      };
+    });
 
     // ---------- components.securitySchemes ----------
     const compSec = spec.components?.securitySchemes || {};
@@ -1329,12 +1360,32 @@ export default function Canvas() {
 
       // components.examples
       parsed.components.examples = {};
-      (reusableExamples || []).forEach((ex) => {
-        const exObj = {};
-        if (ex.summary) exObj.summary = ex.summary;
-        if (ex.value !== undefined) exObj.value = ex.value;
-        if (!("value" in exObj) && ex.externalValue) exObj.externalValue = ex.externalValue;
-        parsed.components.examples[ex.key] = exObj;
+      (reusableExamples || []).forEach(ex => {
+        // externalValue beats value per spec
+        if (ex.mode === "external" && ex.externalValue) {
+          parsed.components.examples[ex.key] = {
+            ...(ex.summary ? { summary: ex.summary } : {}),
+            externalValue: ex.externalValue
+          };
+        } else if (ex.mode === "raw" && ex.valueJson?.trim()) {
+          try {
+            parsed.components.examples[ex.key] = {
+              ...(ex.summary ? { summary: ex.summary } : {}),
+              value: JSON.parse(ex.valueJson)
+            };
+          } catch {
+            // fallback: store as string so YAML remains valid
+            parsed.components.examples[ex.key] = {
+              ...(ex.summary ? { summary: ex.summary } : {}),
+              value: ex.valueJson
+            };
+          }
+        } else if (ex.mode === "form") {
+          parsed.components.examples[ex.key] = {
+            ...(ex.summary ? { summary: ex.summary } : {}),
+            value: ex.structuredValue ?? null
+          };
+        }
       });
 
       // components.securitySchemes
@@ -1353,7 +1404,8 @@ export default function Canvas() {
       parsed.tags = Array.from(allTagNames).map((name) => ({ name }));
 
       setOpenapi(parsed);
-      setYamlSpec(yaml.dump(parsed));
+      const nextYaml = yaml.dump(parsed);
+      setYamlSpec((prev) => (prev === nextYaml ? prev : nextYaml));
     } catch (e) {
       console.error("Failed to parse or update YAML", e);
     }
@@ -1367,7 +1419,7 @@ export default function Canvas() {
     reusableHeaders,
     reusableExamples,
     reusableSecurity,
-    yamlSpec,
+    // yamlSpec,
   ]);
 
   return (
@@ -1517,7 +1569,20 @@ export default function Canvas() {
               editingHeaders,
               setEditingHeaders,
             }}
+            exampleProps={{
+              reusableExamples,
+              setReusableExamples,
+              editingExamples,
+              setEditingExamples,
+              // for form-building:
+              schemas,
+              reusableResponses,
+              reusableRequestBodies,
+              reusableParams: reusableParams,
+              reusableHeaders,
+            }}
             // if you already have security schemes tab, pass those props here too
+
             securityProps={{
               reusableSecurity,
               setReusableSecurity,
