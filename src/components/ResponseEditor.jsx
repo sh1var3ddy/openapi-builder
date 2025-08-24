@@ -1,7 +1,12 @@
-// src/components/ResponseEditor.jsx
 import styles from "./Canvas.module.css";
 
-export default function ResponseEditor({ block, idx, updateBlock, schemas }) {
+export default function ResponseEditor({
+  block,
+  idx,
+  updateBlock,
+  schemas,
+  reusableResponses = [],
+}) {
   const responses = block.responses || [];
 
   const updateResponse = (rIdx, key, value) => {
@@ -48,10 +53,13 @@ export default function ResponseEditor({ block, idx, updateBlock, schemas }) {
               value={res.description}
               onChange={(e) => updateResponse(rIdx, "description", e.target.value)}
             />
+
+            {/* Body schema dropdown with primitives, component schemas, and components.responses */}
             <select
               className={styles.metaInput}
-              value={res.schemaRef}
-              onChange={(e) => updateResponse(rIdx, "schemaRef", e.target.value)}
+              value={res.schemaRef || ""}
+              onChange={(e) => updateResponse(rIdx, "schemaRef", e.target.value || "")}
+              title="Response body schema"
             >
               <option value="">No Body</option>
               <optgroup label="Primitive Types">
@@ -61,14 +69,26 @@ export default function ResponseEditor({ block, idx, updateBlock, schemas }) {
                 <option value="type:number">number</option>
                 <option value="type:double">double</option>
               </optgroup>
+
               <optgroup label="Component Schemas">
                 {schemas.map((s) => (
                   <option key={s.name} value={`ref:${s.name}`}>{s.name}</option>
                 ))}
               </optgroup>
+
+              {/* Inline components.responses — store as resp:<key> so YAML build can $ref the component */}
+              {Array.isArray(reusableResponses) && reusableResponses.length > 0 && (
+                <optgroup label="components.responses">
+                  {reusableResponses.map((r) => (
+                    <option key={r.id} value={`resp:${r.key}`}>
+                      #/components/responses/{r.key}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
-            {/* 👇 visible, inline delete */}
+            {/* delete */}
             <button
               className={styles.inlineDeleteBtn}
               onClick={(e) => deleteResponse(rIdx, e)}
