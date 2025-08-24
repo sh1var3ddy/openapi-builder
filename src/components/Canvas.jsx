@@ -1047,20 +1047,26 @@ export default function Canvas() {
 
         // requestBody (inline primitive/ref)
         if (requestSchemaRef) {
-          let schemaObj = {};
-          if (requestSchemaRef.startsWith("ref:"))
-            schemaObj = {
-              $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}`,
+          if (requestSchemaRef.startsWith("rb:")) {
+            const key = requestSchemaRef.slice(3);
+            // NOTE: when using a $ref, you can't add siblings like "required" here.
+            // Put `required` in the component itself if needed.
+            methodObject.requestBody = { $ref: `#/components/requestBodies/${key}` };
+          } else {
+            let schemaObj = {};
+            if (requestSchemaRef.startsWith("ref:")) {
+              schemaObj = {
+                $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}`,
+              };
+            } else if (requestSchemaRef.startsWith("type:")) {
+              const t = requestSchemaRef.replace("type:", "");
+              schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
+            }
+            methodObject.requestBody = {
+              required: true,
+              content: { "application/json": { schema: schemaObj } },
             };
-          else if (requestSchemaRef.startsWith("type:")) {
-            const t = requestSchemaRef.replace("type:", "");
-            schemaObj =
-              t === "double" ? { type: "number", format: "double" } : { type: t };
           }
-          methodObject.requestBody = {
-            required: true,
-            content: { "application/json": { schema: schemaObj } },
-          };
         }
 
         // responses (custom list OR default 200)

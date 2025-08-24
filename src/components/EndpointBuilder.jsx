@@ -89,7 +89,7 @@ export default function EndpointBuilder({
               placeholder="Description"
             />
 
-            {/* Request Body Schema (unchanged) */}
+            {/* Request Body Schema */}
             <select
               className={styles.metaInput}
               value={block.requestSchemaRef || ""}
@@ -97,6 +97,7 @@ export default function EndpointBuilder({
               title="Request body schema"
             >
               <option value="">No Request Body</option>
+
               <optgroup label="Primitive Types">
                 <option value="type:string">string</option>
                 <option value="type:integer">integer</option>
@@ -104,6 +105,7 @@ export default function EndpointBuilder({
                 <option value="type:number">number</option>
                 <option value="type:double">double</option>
               </optgroup>
+
               <optgroup label="Component Schemas">
                 {schemas.map((s) => (
                   <option key={s.name} value={`ref:${s.name}`}>
@@ -111,6 +113,17 @@ export default function EndpointBuilder({
                   </option>
                 ))}
               </optgroup>
+
+              {/* NEW: inline components.requestBodies */}
+              {Array.isArray(reusableRequestBodies) && reusableRequestBodies.length > 0 && (
+                <optgroup label="components.requestBodies">
+                  {reusableRequestBodies.map((rb) => (
+                    <option key={rb.id} value={`rb:${rb.key}`}>
+                      #/components/requestBodies/{rb.key}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
             {/* Default 200 Response Body Schema — NOW includes components.responses */}
