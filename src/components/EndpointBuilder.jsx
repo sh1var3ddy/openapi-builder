@@ -8,7 +8,9 @@ export default function EndpointBuilder({
   deleteBlock,
   schemas,
   duplicateBlock,
-  reusableParams = [], // NEW: reusable components.parameters
+  reusableParams = [],            // components.parameters
+  reusableResponses = [],         // components.responses  ✅ used below
+  reusableRequestBodies = [],     // components.requestBodies (unused here)
 }) {
   return (
     <>
@@ -20,7 +22,6 @@ export default function EndpointBuilder({
             <span className={styles.pathLabel}>{block.path || "/new-path"}</span>
 
             <div className={styles.summaryActions}>
-              {/* Duplicate */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -34,7 +35,6 @@ export default function EndpointBuilder({
                 ⧉
               </button>
 
-              {/* Delete */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -73,7 +73,7 @@ export default function EndpointBuilder({
               placeholder="operationId"
             />
 
-            {/* Tags (comma-separated) */}
+            {/* Tags */}
             <input
               className={styles.metaInput}
               value={block.tagsText || ""}
@@ -97,6 +97,7 @@ export default function EndpointBuilder({
               title="Request body schema"
             >
               <option value="">No Request Body</option>
+
               <optgroup label="Primitive Types">
                 <option value="type:string">string</option>
                 <option value="type:integer">integer</option>
@@ -104,6 +105,7 @@ export default function EndpointBuilder({
                 <option value="type:number">number</option>
                 <option value="type:double">double</option>
               </optgroup>
+
               <optgroup label="Component Schemas">
                 {schemas.map((s) => (
                   <option key={s.name} value={`ref:${s.name}`}>
@@ -111,9 +113,20 @@ export default function EndpointBuilder({
                   </option>
                 ))}
               </optgroup>
+
+              {/* NEW: inline components.requestBodies */}
+              {Array.isArray(reusableRequestBodies) && reusableRequestBodies.length > 0 && (
+                <optgroup label="components.requestBodies">
+                  {reusableRequestBodies.map((rb) => (
+                    <option key={rb.id} value={`rb:${rb.key}`}>
+                      #/components/requestBodies/{rb.key}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
-            {/* Response Body Schema */}
+            {/* Default 200 Response Body Schema — NOW includes components.responses */}
             <select
               className={styles.metaInput}
               value={block.responseSchemaRef || ""}
@@ -135,9 +148,18 @@ export default function EndpointBuilder({
                   </option>
                 ))}
               </optgroup>
+              {Array.isArray(reusableResponses) && reusableResponses.length > 0 && (
+                <optgroup label="components.responses">
+                  {reusableResponses.map((r) => (
+                    <option key={r.id} value={`resp:${r.key}`}>
+                      #/components/responses/{r.key}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
-            {/* Parameters (collapsible) */}
+            {/* Parameters */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
                 <span className={styles.sectionTitle}>Parameters</span>
@@ -147,12 +169,12 @@ export default function EndpointBuilder({
                   block={block}
                   idx={idx}
                   updateBlock={updateBlock}
-                  reusableParams={reusableParams} // NEW
+                  reusableParams={reusableParams}
                 />
               </div>
             </details>
 
-            {/* Custom Responses (collapsible) */}
+            {/* Responses */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
                 <span className={styles.sectionTitle}>Responses</span>
@@ -163,6 +185,7 @@ export default function EndpointBuilder({
                   idx={idx}
                   updateBlock={updateBlock}
                   schemas={schemas}
+                  reusableResponses={reusableResponses} 
                 />
               </div>
             </details>

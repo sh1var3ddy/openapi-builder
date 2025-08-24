@@ -1047,61 +1047,79 @@ export default function Canvas() {
 
         // requestBody (inline primitive/ref)
         if (requestSchemaRef) {
-          let schemaObj = {};
-          if (requestSchemaRef.startsWith("ref:"))
-            schemaObj = {
-              $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}`,
+          if (requestSchemaRef.startsWith("rb:")) {
+            const key = requestSchemaRef.slice(3);
+            // NOTE: when using a $ref, you can't add siblings like "required" here.
+            // Put `required` in the component itself if needed.
+            methodObject.requestBody = { $ref: `#/components/requestBodies/${key}` };
+          } else {
+            let schemaObj = {};
+            if (requestSchemaRef.startsWith("ref:")) {
+              schemaObj = {
+                $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}`,
+              };
+            } else if (requestSchemaRef.startsWith("type:")) {
+              const t = requestSchemaRef.replace("type:", "");
+              schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
+            }
+            methodObject.requestBody = {
+              required: true,
+              content: { "application/json": { schema: schemaObj } },
             };
-          else if (requestSchemaRef.startsWith("type:")) {
-            const t = requestSchemaRef.replace("type:", "");
-            schemaObj =
-              t === "double" ? { type: "number", format: "double" } : { type: t };
           }
-          methodObject.requestBody = {
-            required: true,
-            content: { "application/json": { schema: schemaObj } },
-          };
         }
 
         // responses (custom list OR default 200)
         if (responses.length > 0) {
           responses.forEach((res) => {
+            // Allow referencing components.responses directly
+            if (res.schemaRef && res.schemaRef.startsWith("resp:")) {
+              const key = res.schemaRef.slice(5);
+              methodObject.responses[res.status || "default"] = {
+                $ref: `#/components/responses/${key}`,
+              };
+              return;
+            }
+
             const resp = { description: res.description || "" };
             if (res.schemaRef) {
               let schemaObj = {};
-              if (res.schemaRef.startsWith("ref:"))
+              if (res.schemaRef.startsWith("ref:")) {
                 schemaObj = {
                   $ref: `#/components/schemas/${res.schemaRef.replace("ref:", "")}`,
                 };
-              else if (res.schemaRef.startsWith("type:")) {
+              } else if (res.schemaRef.startsWith("type:")) {
                 const t = res.schemaRef.replace("type:", "");
-                schemaObj =
-                  t === "double"
-                    ? { type: "number", format: "double" }
-                    : { type: t };
+                schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
               }
               resp.content = { "application/json": { schema: schemaObj } };
             }
             methodObject.responses[res.status || "default"] = resp;
           });
         } else if (responseSchemaRef) {
-          let schemaObj = {};
-          if (responseSchemaRef.startsWith("ref:"))
-            schemaObj = {
-              $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}`,
+          // NEW: support components.responses for default 200
+          if (responseSchemaRef.startsWith("resp:")) {
+            const key = responseSchemaRef.slice(5);
+            methodObject.responses["200"] = { $ref: `#/components/responses/${key}` };
+          } else {
+            let schemaObj = {};
+            if (responseSchemaRef.startsWith("ref:")) {
+              schemaObj = {
+                $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}`,
+              };
+            } else if (responseSchemaRef.startsWith("type:")) {
+              const t = responseSchemaRef.replace("type:", "");
+              schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
+            }
+            methodObject.responses["200"] = {
+              description: "Success",
+              content: { "application/json": { schema: schemaObj } },
             };
-          else if (responseSchemaRef.startsWith("type:")) {
-            const t = responseSchemaRef.replace("type:", "");
-            schemaObj =
-              t === "double" ? { type: "number", format: "double" } : { type: t };
           }
-          methodObject.responses["200"] = {
-            description: "Success",
-            content: { "application/json": { schema: schemaObj } },
-          };
         } else {
           methodObject.responses["200"] = { description: "Success" };
         }
+
 
         parsed.paths[path][method] = methodObject;
       });
@@ -1441,6 +1459,9 @@ export default function Canvas() {
             schemas={schemas}
             duplicateBlock={duplicateBlock}
             reusableParams={reusableParams} // for $ref parameter dropdowns
+            reusableResponses={reusableResponses} // for $ref response dropdowns
+            reusableRequestBodies={reusableRequestBodies} // for $ref request body dropdowns
+            reusableHeaders={reusableHeaders} // for $ref header dropdowns
           />
         </div>
 
