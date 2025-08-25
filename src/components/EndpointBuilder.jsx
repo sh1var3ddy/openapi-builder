@@ -127,7 +127,7 @@ export default function EndpointBuilder({
             </select>
 
             {/* Default 200 Response Body Schema — NOW includes components.responses */}
-            <select
+            {/* <select
               className={styles.metaInput}
               value={block.responseSchemaRef || ""}
               onChange={(e) => updateBlock(idx, "responseSchemaRef", e.target.value)}
@@ -157,7 +157,7 @@ export default function EndpointBuilder({
                   ))}
                 </optgroup>
               )}
-            </select>
+            </select> */}
 
             {/* Parameters */}
             <details className={styles.section} open>
