@@ -1049,22 +1049,28 @@ export default function Canvas() {
         if (requestSchemaRef) {
           if (requestSchemaRef.startsWith("rb:")) {
             const key = requestSchemaRef.slice(3);
-            // NOTE: when using a $ref, you can't add siblings like "required" here.
-            // Put `required` in the component itself if needed.
+            // NOTE: when using a $ref, you cannot add siblings like "required" here.
             methodObject.requestBody = { $ref: `#/components/requestBodies/${key}` };
           } else {
             let schemaObj = {};
             if (requestSchemaRef.startsWith("ref:")) {
-              schemaObj = {
-                $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}`,
-              };
+              schemaObj = { $ref: `#/components/schemas/${requestSchemaRef.replace("ref:", "")}` };
             } else if (requestSchemaRef.startsWith("type:")) {
               const t = requestSchemaRef.replace("type:", "");
               schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
             }
+
+            const media = { schema: schemaObj };
+
+            // Optional: operation-level request example (if you later add block.requestExampleRef)
+            if (block.requestExampleRef && block.requestExampleRef.startsWith("ex:")) {
+              const exKey = block.requestExampleRef.slice(3);
+              media.examples = { [exKey]: { $ref: `#/components/examples/${exKey}` } };
+            }
+
             methodObject.requestBody = {
               required: true,
-              content: { "application/json": { schema: schemaObj } },
+              content: { "application/json": media },
             };
           }
         }
@@ -1082,45 +1088,58 @@ export default function Canvas() {
             }
 
             const resp = { description: res.description || "" };
+
+            // Build media (schema + optional example)
+            let media = null;
             if (res.schemaRef) {
               let schemaObj = {};
               if (res.schemaRef.startsWith("ref:")) {
-                schemaObj = {
-                  $ref: `#/components/schemas/${res.schemaRef.replace("ref:", "")}`,
-                };
+                schemaObj = { $ref: `#/components/schemas/${res.schemaRef.replace("ref:", "")}` };
               } else if (res.schemaRef.startsWith("type:")) {
                 const t = res.schemaRef.replace("type:", "");
                 schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
               }
-              resp.content = { "application/json": { schema: schemaObj } };
+              media = { schema: schemaObj };
             }
+
+            if (res.exampleRef && res.exampleRef.startsWith("ex:")) {
+              const exKey = res.exampleRef.slice(3);
+              media = { ...(media || {}), examples: { [exKey]: { $ref: `#/components/examples/${exKey}` } } };
+            }
+
+            if (media) resp.content = { "application/json": media };
             methodObject.responses[res.status || "default"] = resp;
           });
         } else if (responseSchemaRef) {
-          // NEW: support components.responses for default 200
+          // Default 200 branch
           if (responseSchemaRef.startsWith("resp:")) {
             const key = responseSchemaRef.slice(5);
             methodObject.responses["200"] = { $ref: `#/components/responses/${key}` };
           } else {
             let schemaObj = {};
             if (responseSchemaRef.startsWith("ref:")) {
-              schemaObj = {
-                $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}`,
-              };
+              schemaObj = { $ref: `#/components/schemas/${responseSchemaRef.replace("ref:", "")}` };
             } else if (responseSchemaRef.startsWith("type:")) {
               const t = responseSchemaRef.replace("type:", "");
               schemaObj = t === "double" ? { type: "number", format: "double" } : { type: t };
             }
+
+            const media = { schema: schemaObj };
+
+            // Optional: operation-level default 200 example (if you later add block.responseExampleRef)
+            if (block.responseExampleRef && block.responseExampleRef.startsWith("ex:")) {
+              const exKey = block.responseExampleRef.slice(3);
+              media.examples = { [exKey]: { $ref: `#/components/examples/${exKey}` } };
+            }
+
             methodObject.responses["200"] = {
               description: "Success",
-              content: { "application/json": { schema: schemaObj } },
+              content: { "application/json": media },
             };
           }
         } else {
           methodObject.responses["200"] = { description: "Success" };
         }
-
-
         parsed.paths[path][method] = methodObject;
       });
 
@@ -1276,22 +1295,32 @@ export default function Canvas() {
       // components.responses
       parsed.components.responses = {};
       (reusableResponses || []).forEach((r) => {
-        // Build optional content
-        let contentObj;
+        const mt = r.mediaType || "application/json";
+
+        // Build optional content entry (schema + examples)
+        const contentEntry = {};
+
         if (r.schemaMode === "primitive") {
-          const t =
+          const schema =
             r.primitiveType === "double"
               ? { type: "number", format: "double" }
-              : { type: r.primitiveType };
-          if (r.primitiveFormat) t.format = r.primitiveFormat;
-          contentObj = { [r.mediaType || "application/json"]: { schema: t } };
+              : { type: r.primitiveType || "string" };
+          if (r.primitiveFormat) schema.format = r.primitiveFormat;
+          contentEntry.schema = schema;
         } else if (r.schemaMode === "ref" && r.refName) {
-          contentObj = {
-            [r.mediaType || "application/json"]: {
-              schema: { $ref: `#/components/schemas/${r.refName}` },
-            },
+          contentEntry.schema = { $ref: `#/components/schemas/${r.refName}` };
+        }
+
+        // Attach example from components.examples if chosen
+        if (r.exampleRef && r.exampleRef.startsWith("ex:")) {
+          const exKey = r.exampleRef.slice(3);
+          contentEntry.examples = {
+            [exKey]: { $ref: `#/components/examples/${exKey}` },
           };
         }
+
+        const contentObj =
+          Object.keys(contentEntry).length > 0 ? { [mt]: contentEntry } : undefined;
 
         // Build optional headers
         const headersList = r.headers || [];
@@ -1330,7 +1359,7 @@ export default function Canvas() {
         };
       });
 
-      // components.headers
+      // components.headers (unchanged)
       parsed.components.headers = {};
       (reusableHeaders || []).forEach((h) => {
         const schema =
@@ -1362,16 +1391,29 @@ export default function Canvas() {
           schema =
             rb.primitiveType === "double"
               ? { type: "number", format: "double" }
-              : { type: rb.primitiveType };
+              : { type: rb.primitiveType || "string" };
           if (rb.primitiveFormat) schema.format = rb.primitiveFormat;
         } else if (rb.schemaMode === "ref" && rb.refName) {
           schema = { $ref: `#/components/schemas/${rb.refName}` };
         }
+
+        const mt = rb.mediaType || "application/json";
+        const media = {};
+        if (schema) media.schema = schema;
+
+        // Attach example from components.examples if chosen
+        if (rb.exampleRef && rb.exampleRef.startsWith("ex:")) {
+          const exKey = rb.exampleRef.slice(3);
+          media.examples = {
+            [exKey]: { $ref: `#/components/examples/${exKey}` },
+          };
+        }
+
         parsed.components.requestBodies[rb.key] = {
           description: rb.description || "",
           required: !!rb.required,
           content: {
-            [rb.mediaType || "application/json"]: { schema: schema || { type: "object" } },
+            [mt]: Object.keys(media).length ? media : { schema: { type: "object" } },
           },
         };
       });
@@ -1561,7 +1603,7 @@ export default function Canvas() {
               startEditSchema,
               duplicateSchema,
               deleteSchemaById,
-              cancelDraft,
+              cancelDraft, 
             }}
             parameterProps={{
               reusableParams,
@@ -1576,6 +1618,7 @@ export default function Canvas() {
               setEditingResponses,
               schemas,
               reusableHeaders,
+              reusableExamples,
             }}
             requestBodyProps={{
               reusableRequestBodies,
@@ -1583,6 +1626,7 @@ export default function Canvas() {
               editingRequestBodies,
               setEditingRequestBodies,
               schemas,
+              reusableExamples,
             }}
             headerProps={{
               reusableHeaders,

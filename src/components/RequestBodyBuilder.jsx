@@ -9,20 +9,22 @@ export default function RequestBodyBuilder({
   editingRequestBodies,
   setEditingRequestBodies,
   schemas = [],
+  reusableExamples = [],            // 👈 NEW: pass from ComponentsPanel
 }) {
   const startNew = () => {
     setEditingRequestBodies(prev => [
       ...prev,
       {
         id: uid(),
-        key: "",                  // ref name in components.requestBodies
+        key: "",
         description: "",
         mediaType: "application/json",
         required: true,
-        schemaMode: "ref",        // primitive|ref
+        schemaMode: "ref",
         primitiveType: "string",
         primitiveFormat: "",
         refName: "",
+        exampleRef: "",              // 👈 NEW
         __editId: null,
       }
     ]);
@@ -124,6 +126,26 @@ export default function RequestBodyBuilder({
               </select>
             </div>
           )}
+
+          {/* 👇 NEW: Example picker from components.examples */}
+          <div className={styles.fieldRow}>
+            <select
+              className={styles.metaInput}
+              value={d.exampleRef || ""}
+              onChange={(e)=>updateDraft(idx, "exampleRef", e.target.value || "")}
+              title="Example (from components.examples)"
+            >
+              <option value="">No Example</option>
+              {(reusableExamples || []).map((ex) => (
+                <option key={ex.id} value={`ex:${ex.key}`}>
+                  #/components/examples/{ex.key}
+                </option>
+              ))}
+            </select>
+            <span className={styles.hintText}>
+              Emits <code>content[mediaType].examples[&lt;key&gt;].$ref</code>
+            </span>
+          </div>
 
           <button className={styles.saveBtn} onClick={()=>submit(idx)}>
             {d.__editId ? "💾 Update Request Body" : "✅ Save Request Body"}
