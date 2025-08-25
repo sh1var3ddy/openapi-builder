@@ -21,21 +21,6 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 /**
  * Manages components.responses
- * Draft shape:
- * {
- *   id, __editId?, key, description, mediaType,
- *   schemaMode: 'none' | 'primitive' | 'ref',
- *   primitiveType, primitiveFormat, refName,
- *   headers: [
- *     {
- *       id, name, mode: 'ref' | 'inline',
- *       refName?, description?,
- *       type?, format?, enum?: string[],
- *       minLength?, maxLength?, pattern?,
- *       minimum?,  maximum?
- *     }
- *   ]
- * }
  */
 export default function ResponseBuilder({
   reusableResponses,
@@ -43,7 +28,8 @@ export default function ResponseBuilder({
   editingResponses,
   setEditingResponses,
   schemas,
-  reusableHeaders,             // 👈 dropdown source
+  reusableHeaders,
+  reusableExamples = [],            // 👈 NEW: pass from ComponentsPanel
 }) {
   const startNew = () => {
     setEditingResponses(prev => [
@@ -58,7 +44,8 @@ export default function ResponseBuilder({
         primitiveType: "string",
         primitiveFormat: "",
         refName: "",
-        headers: [],          // header entries (inline or ref)
+        headers: [],
+        exampleRef: "",              // 👈 NEW
       }
     ]);
   };
@@ -112,11 +99,11 @@ export default function ResponseBuilder({
   const addHeader = (idx) => {
     const h = {
       id: uid(),
-      name: "",        // the actual HTTP header field name in the response map
-      mode: "ref",     // 'ref' | 'inline'
-      refName: "",     // key under components.headers when mode='ref'
+      name: "",
+      mode: "ref",
+      refName: "",
       description: "",
-      type: "string",  // for inline
+      type: "string",
       format: "",
       enum: [],
       minLength: undefined,
@@ -131,12 +118,9 @@ export default function ResponseBuilder({
   const updateHeader = (idx, hIdx, key, value) => {
     const list = [ ...(editingResponses[idx].headers || []) ];
     list[hIdx] = { ...list[hIdx], [key]: value };
-
-    // If switching to 'ref' and header name is blank, default name to ref key
     if (key === "refName" && list[hIdx].mode === "ref" && !list[hIdx].name) {
       list[hIdx].name = value || "";
     }
-
     updateDraft(idx, "headers", list);
   };
 
@@ -171,6 +155,7 @@ export default function ResponseBuilder({
       {(editingResponses || []).map((d, idx) => {
         const showPrimitive = d.schemaMode === "primitive";
         const showRef       = d.schemaMode === "ref";
+        const hasContent    = d.schemaMode !== "none";
 
         return (
           <div key={d.id} className={styles.schemaBlock}>
@@ -206,8 +191,7 @@ export default function ResponseBuilder({
                 <option value="ref">Schema $ref</option>
               </select>
 
-              {/* media type when content exists */}
-              {d.schemaMode !== "none" && (
+              {hasContent && (
                 <input
                   className={styles.metaInput}
                   placeholder="Media type (e.g., application/json)"
@@ -261,7 +245,29 @@ export default function ResponseBuilder({
               </div>
             )}
 
-            {/* Headers section */}
+            {/* 👇 NEW: Example picker for components.examples (only when content exists) */}
+            {hasContent && (
+              <div className={styles.fieldRow}>
+                <select
+                  className={styles.metaInput}
+                  value={d.exampleRef || ""}
+                  onChange={(e) => updateDraft(idx, "exampleRef", e.target.value || "")}
+                  title="Example (from components.examples)"
+                >
+                  <option value="">No Example</option>
+                  {(reusableExamples || []).map((ex) => (
+                    <option key={ex.id} value={`ex:${ex.key}`}>
+                      #/components/examples/{ex.key}
+                    </option>
+                  ))}
+                </select>
+                <span className={styles.hintText}>
+                  Emits <code>content[mediaType].examples[&lt;key&gt;].$ref</code>
+                </span>
+              </div>
+            )}
+
+            {/* Headers section (unchanged) */}
             <details className={styles.section} open>
               <summary className={styles.sectionSummary}>
                 <span className={styles.sectionTitle}>Headers</span>
@@ -303,7 +309,6 @@ export default function ResponseBuilder({
                         <button className={styles.inlineDeleteBtn} onClick={() => deleteHeader(idx, hIdx)}>✕</button>
                       </div>
 
-                      {/* Reference picker */}
                       {h.mode === "ref" && (
                         <div className={styles.fieldRow}>
                           <select
@@ -321,7 +326,6 @@ export default function ResponseBuilder({
                         </div>
                       )}
 
-                      {/* Inline header schema */}
                       {h.mode === "inline" && (
                         <>
                           <input
@@ -356,7 +360,6 @@ export default function ResponseBuilder({
                             </select>
                           </div>
 
-                          {/* Optional enum */}
                           {(Array.isArray(h.enum) && h.enum.length > 0) ? (
                             <div className={styles.enumEditor}>
                               <div className={styles.enumHeader}>
@@ -408,57 +411,29 @@ export default function ResponseBuilder({
                             </div>
                           )}
 
-                          {/* Validations */}
                           <div className={styles.fieldRow}>
                             {showStringValidations && (
                               <>
-                                <input
-                                  className={styles.metaInput}
-                                  type="number"
-                                  placeholder="minLength"
+                                <input className={styles.metaInput} type="number" placeholder="minLength"
                                   value={h.minLength ?? ""}
-                                  onChange={(e) =>
-                                    updateHeader(idx, hIdx, "minLength", e.target.value === "" ? undefined : Number(e.target.value))
-                                  }
-                                />
-                                <input
-                                  className={styles.metaInput}
-                                  type="number"
-                                  placeholder="maxLength"
+                                  onChange={(e)=> updateHeader(idx, hIdx, "minLength", e.target.value === "" ? undefined : Number(e.target.value))}/>
+                                <input className={styles.metaInput} type="number" placeholder="maxLength"
                                   value={h.maxLength ?? ""}
-                                  onChange={(e) =>
-                                    updateHeader(idx, hIdx, "maxLength", e.target.value === "" ? undefined : Number(e.target.value))
-                                  }
-                                />
-                                <input
-                                  className={styles.metaInput}
-                                  placeholder="pattern (regex)"
+                                  onChange={(e)=> updateHeader(idx, hIdx, "maxLength", e.target.value === "" ? undefined : Number(e.target.value))}/>
+                                <input className={styles.metaInput} placeholder="pattern (regex)"
                                   value={h.pattern || ""}
-                                  onChange={(e) => updateHeader(idx, hIdx, "pattern", e.target.value)}
-                                />
+                                  onChange={(e)=> updateHeader(idx, hIdx, "pattern", e.target.value)}/>
                               </>
                             )}
 
                             {showNumberValidations && (
                               <>
-                                <input
-                                  className={styles.metaInput}
-                                  type="number"
-                                  placeholder="minimum"
+                                <input className={styles.metaInput} type="number" placeholder="minimum"
                                   value={h.minimum ?? ""}
-                                  onChange={(e) =>
-                                    updateHeader(idx, hIdx, "minimum", e.target.value === "" ? undefined : Number(e.target.value))
-                                  }
-                                />
-                                <input
-                                  className={styles.metaInput}
-                                  type="number"
-                                  placeholder="maximum"
+                                  onChange={(e)=> updateHeader(idx, hIdx, "minimum", e.target.value === "" ? undefined : Number(e.target.value))}/>
+                                <input className={styles.metaInput} type="number" placeholder="maximum"
                                   value={h.maximum ?? ""}
-                                  onChange={(e) =>
-                                    updateHeader(idx, hIdx, "maximum", e.target.value === "" ? undefined : Number(e.target.value))
-                                  }
-                                />
+                                  onChange={(e)=> updateHeader(idx, hIdx, "maximum", e.target.value === "" ? undefined : Number(e.target.value))}/>
                               </>
                             )}
                           </div>
