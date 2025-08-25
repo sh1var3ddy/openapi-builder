@@ -4,15 +4,193 @@ import styles from "./Canvas.module.css";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-/**
- * PROPS NEEDED:
- * - reusableExamples, setReusableExamples, editingExamples, setEditingExamples (as before)
- * - schemas: array of your component schemas (from Canvas)
- * - reusableResponses: array from ResponseBuilder (to detect content schema)
- * - reusableRequestBodies: array from RequestBodyBuilder (to detect content schema)
- * - reusableParams: array from ParameterBuilder (to detect param schema)
- * - reusableHeaders: array from HeaderBuilder (to detect header schema)
- */
+/* ---------- helpers moved to top-level so NodeEditor is stable ---------- */
+function defaultValueFor(node) {
+  if (!node) return null;
+  if (node.oneOf || node.anyOf) {
+    const arr = node.oneOf || node.anyOf;
+    return defaultValueFor(arr[0] || { type: "string" });
+  }
+  switch (node.type) {
+    case "object":  return {};
+    case "array":   return [];
+    case "number":
+    case "integer": return 0;
+    case "boolean": return false;
+    case "string":
+    default:        return "";
+  }
+}
+
+/** Stable component (no longer recreated each render) */
+function NodeEditor({ node, value, onChange }) {
+  if (!node) return null;
+
+  if (node.oneOf || node.anyOf) {
+    const keyword = node.oneOf ? "oneOf" : "anyOf";
+    const variants = node[keyword] || [];
+    const [choiceIndex, setChoiceIndex] = useState(0);
+    const safeIndex = Math.min(choiceIndex, Math.max(variants.length - 1, 0));
+
+    return (
+      <div className={styles.schemaBlock}>
+        <div className={styles.fieldRow}>
+          <span style={{ fontWeight: 600 }}>{keyword}</span>
+          <select
+            className={styles.metaInput}
+            value={safeIndex}
+            onChange={(e) => {
+              const idx = Number(e.target.value);
+              setChoiceIndex(idx);
+              const def = defaultValueFor(variants[idx]);
+              onChange(def);
+            }}
+          >
+            {variants.map((_, i) => (
+              <option key={i} value={i}>
+                Variant {i + 1}
+              </option>
+            ))}
+          </select>
+        </div>
+        <NodeEditor node={variants[safeIndex]} value={value} onChange={onChange} />
+      </div>
+    );
+  }
+
+  if (node.type === "object") {
+    const props = node.properties || {};
+    return (
+      <div className={styles.schemaBlock}>
+        {Object.entries(props).map(([k, child]) => (
+          <div key={k} className={styles.fieldRow}>
+            <label className={styles.headerLabel} style={{ minWidth: 120 }}>
+              {k}
+            </label>
+            <NodeEditor
+              node={child}
+              value={value?.[k]}
+              onChange={(nv) => onChange({ ...(value || {}), [k]: nv })}
+            />
+          </div>
+        ))}
+        {Object.keys(props).length === 0 && (
+          <div className={styles.emptyMessage}>
+            No properties; switch to Raw JSON if needed.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (node.type === "array") {
+    const items = node.items || { type: "string" };
+    const arr = Array.isArray(value) ? value : [];
+    return (
+      <div className={styles.schemaBlock}>
+        {arr.map((v, i) => (
+          <div key={i} className={styles.fieldRow}>
+            <span className={styles.headerLabel} style={{ minWidth: 60 }}>
+              [{i}]
+            </span>
+            <NodeEditor
+              node={items}
+              value={v}
+              onChange={(nv) => {
+                const copy = [...arr];
+                copy[i] = nv;
+                onChange(copy);
+              }}
+            />
+            <button
+              className={styles.inlineDeleteBtn}
+              onClick={() => onChange(arr.filter((_, idx) => idx !== i))}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          className={styles.addBtn}
+          onClick={() => onChange([...(arr || []), defaultValueFor(items)])}
+        >
+          + Add Item
+        </button>
+      </div>
+    );
+  }
+
+  if (node.type === "boolean") {
+    return (
+      <select
+        className={styles.metaInput}
+        value={String(!!value)}
+        onChange={(e) => onChange(e.target.value === "true")}
+      >
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    );
+  }
+
+  if (node.type === "number" || node.type === "integer") {
+    return (
+      <input
+        className={styles.metaInput}
+        type="number"
+        value={value ?? 0}
+        onChange={(e) =>
+          onChange(e.target.value === "" ? 0 : Number(e.target.value))
+        }
+      />
+    );
+  }
+
+  if (Array.isArray(node.enum) && node.enum.length) {
+    return (
+      <select
+        className={styles.metaInput}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">— select —</option>
+        {node.enum.map((ev, i) => (
+          <option key={i} value={String(ev)}>
+            {String(ev)}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <input
+      className={styles.metaInput}
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+/* ------------------------- Pretty helpers (unchanged) ------------------------- */
+function safePrettyObj(obj) {
+  try {
+    return JSON.stringify(obj ?? null, null, 2);
+  } catch {
+    return String(obj);
+  }
+}
+function safePrettyJson(s) {
+  try {
+    if (!s?.trim()) return "(empty)";
+    const o = JSON.parse(s);
+    return JSON.stringify(o, null, 2);
+  } catch {
+    return s;
+  }
+}
+
+/* ============================== MAIN COMPONENT ============================== */
 export default function ExamplesBuilder({
   reusableExamples,
   setReusableExamples,
@@ -99,7 +277,7 @@ export default function ExamplesBuilder({
   }
 
   // Given target, get JSON node
-  function resolveTargetJsonNode(targetType, targetKey, mediaType) {
+  function resolveTargetJsonNode(targetType, targetKey /*, mediaType */) {
     if (!targetType || !targetKey) return null;
 
     if (targetType === "schemas") {
@@ -154,176 +332,6 @@ export default function ExamplesBuilder({
     }
 
     return null;
-  }
-
-  function defaultValueFor(node) {
-    if (!node) return null;
-    if (node.oneOf || node.anyOf) {
-      const arr = node.oneOf || node.anyOf;
-      return defaultValueFor(arr[0] || { type: "string" });
-    }
-    switch (node.type) {
-      case "object":
-        return {};
-      case "array":
-        return [];
-      case "number":
-      case "integer":
-        return 0;
-      case "boolean":
-        return false;
-      case "string":
-      default:
-        return "";
-    }
-  }
-
-  // Render editor for a node
-  function NodeEditor({ node, value, onChange }) {
-    if (!node) return null;
-
-    if (node.oneOf || node.anyOf) {
-      const keyword = node.oneOf ? "oneOf" : "anyOf";
-      const variants = node[keyword] || [];
-      const [choiceIndex, setChoiceIndex] = useState(0);
-      return (
-        <div className={styles.schemaBlock}>
-          <div className={styles.fieldRow}>
-            <span style={{ fontWeight: 600 }}>{keyword}</span>
-            <select
-              className={styles.metaInput}
-              value={choiceIndex}
-              onChange={(e) => {
-                const idx = Number(e.target.value);
-                setChoiceIndex(idx);
-                const def = defaultValueFor(variants[idx]);
-                onChange(def);
-              }}
-            >
-              {variants.map((_, i) => (
-                <option key={i} value={i}>
-                  Variant {i + 1}
-                </option>
-              ))}
-            </select>
-          </div>
-          <NodeEditor node={variants[choiceIndex]} value={value} onChange={onChange} />
-        </div>
-      );
-    }
-
-    if (node.type === "object") {
-      const props = node.properties || {};
-      return (
-        <div className={styles.schemaBlock}>
-          {Object.entries(props).map(([k, child]) => (
-            <div key={k} className={styles.fieldRow}>
-              <label className={styles.headerLabel} style={{ minWidth: 120 }}>
-                {k}
-              </label>
-              <NodeEditor
-                node={child}
-                value={value?.[k]}
-                onChange={(nv) => onChange({ ...(value || {}), [k]: nv })}
-              />
-            </div>
-          ))}
-          {Object.keys(props).length === 0 && (
-            <div className={styles.emptyMessage}>
-              No properties; switch to Raw JSON if needed.
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (node.type === "array") {
-      const items = node.items || { type: "string" };
-      const arr = Array.isArray(value) ? value : [];
-      return (
-        <div className={styles.schemaBlock}>
-          {arr.map((v, i) => (
-            <div key={i} className={styles.fieldRow}>
-              <span className={styles.headerLabel} style={{ minWidth: 60 }}>
-                [{i}]
-              </span>
-              <NodeEditor
-                node={items}
-                value={v}
-                onChange={(nv) => {
-                  const copy = [...arr];
-                  copy[i] = nv;
-                  onChange(copy);
-                }}
-              />
-              <button
-                className={styles.inlineDeleteBtn}
-                onClick={() => onChange(arr.filter((_, idx) => idx !== i))}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <button
-            className={styles.addBtn}
-            onClick={() => onChange([...(arr || []), defaultValueFor(items)])}
-          >
-            + Add Item
-          </button>
-        </div>
-      );
-    }
-
-    if (node.type === "boolean") {
-      return (
-        <select
-          className={styles.metaInput}
-          value={String(!!value)}
-          onChange={(e) => onChange(e.target.value === "true")}
-        >
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
-      );
-    }
-
-    if (node.type === "number" || node.type === "integer") {
-      return (
-        <input
-          className={styles.metaInput}
-          type="number"
-          value={value ?? 0}
-          onChange={(e) =>
-            onChange(e.target.value === "" ? 0 : Number(e.target.value))
-          }
-        />
-      );
-    }
-
-    if (Array.isArray(node.enum) && node.enum.length) {
-      return (
-        <select
-          className={styles.metaInput}
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">— select —</option>
-          {node.enum.map((ev, i) => (
-            <option key={i} value={String(ev)}>
-              {String(ev)}
-            </option>
-          ))}
-        </select>
-      );
-    }
-
-    return (
-      <input
-        className={styles.metaInput}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
   }
 
   /* ------------------------------ behavior ------------------------------ */
@@ -417,16 +425,10 @@ export default function ExamplesBuilder({
                 <button className={styles.addBtn} onClick={() => startEdit(e.id)}>
                   Edit
                 </button>
-                <button
-                  className={styles.addBtn}
-                  onClick={() => duplicate(e.id)}
-                >
+                <button className={styles.addBtn} onClick={() => duplicate(e.id)}>
                   Duplicate
                 </button>
-                <button
-                  className={styles.inlineDeleteBtn}
-                  onClick={() => remove(e.id)}
-                >
+                <button className={styles.inlineDeleteBtn} onClick={() => remove(e.id)}>
                   ✕
                 </button>
               </div>
@@ -438,7 +440,7 @@ export default function ExamplesBuilder({
       {(editingExamples || []).map((d, idx) => {
         const jsonNode =
           d.mode === "form"
-            ? resolveTargetJsonNode(d.targetType, d.targetKey, d.mediaType)
+            ? resolveTargetJsonNode(d.targetType, d.targetKey /*, d.mediaType */)
             : null;
 
         return (
@@ -460,10 +462,7 @@ export default function ExamplesBuilder({
                 <option value="raw">Raw JSON</option>
                 <option value="external">External URL</option>
               </select>
-              <button
-                className={styles.inlineDeleteBtn}
-                onClick={() => discard(idx)}
-              >
+              <button className={styles.inlineDeleteBtn} onClick={() => discard(idx)}>
                 Discard
               </button>
             </div>
@@ -610,10 +609,7 @@ export default function ExamplesBuilder({
               <div className={styles.enumHeader}>
                 <span>Preview</span>
               </div>
-              <pre
-                style={{ margin: 0, whiteSpace: "pre-wrap" }}
-                className={styles.previewBox}
-              >
+              <pre style={{ margin: 0, whiteSpace: "pre-wrap" }} className={styles.previewBox}>
                 {d.mode === "external"
                   ? `externalValue: ${d.externalValue || "(none)"}`
                   : d.mode === "raw"
@@ -634,22 +630,4 @@ export default function ExamplesBuilder({
       </button>
     </div>
   );
-}
-
-/* ----------------------- utils for preview only ----------------------- */
-function safePrettyObj(obj) {
-  try {
-    return JSON.stringify(obj ?? null, null, 2);
-  } catch {
-    return String(obj);
-  }
-}
-function safePrettyJson(s) {
-  try {
-    if (!s?.trim()) return "(empty)";
-    const o = JSON.parse(s);
-    return JSON.stringify(o, null, 2);
-  } catch {
-    return s;
-  }
 }
